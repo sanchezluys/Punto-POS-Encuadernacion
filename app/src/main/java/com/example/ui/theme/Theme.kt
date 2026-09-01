@@ -13,19 +13,27 @@ import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
     primary = DarkPrimary,
-    onPrimary = Color(0xFF003062),
-    primaryContainer = Color(0xFF004689),
-    onPrimaryContainer = Color(0xFFD7E3F7),
+    onPrimary = DarkOnPrimary,
+    primaryContainer = DarkPrimaryContainer,
+    onPrimaryContainer = DarkOnPrimaryContainer,
     secondary = DarkSecondary,
-    onSecondary = Color(0xFF002D6E),
-    tertiary = MinimalBluePrimary,
+    onSecondary = DarkOnSecondary,
+    secondaryContainer = DarkSecondaryContainer,
+    onSecondaryContainer = DarkOnSecondaryContainer,
+    tertiary = DarkSecondary,
+    onTertiary = DarkOnSecondary,
     background = DarkBackground,
     surface = DarkSurface,
     surfaceVariant = DarkSurfaceVariant,
     onBackground = Color(0xFFE2E2E9),
     onSurface = Color(0xFFE2E2E9),
     onSurfaceVariant = Color(0xFFC4C6D0),
-    outline = Color(0xFF3B4048)
+    outline = Color(0xFF43474E),
+    outlineVariant = Color(0xFF2C3036),
+    error = Color(0xFFFFB4AB),
+    errorContainer = Color(0xFF93000A),
+    onError = Color(0xFF690005),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -34,10 +42,11 @@ private val LightColorScheme = lightColorScheme(
     primaryContainer = MinimalBlueContainer,
     onPrimaryContainer = MinimalBlueOnContainer,
     secondary = MinimalSecondary,
-    onSecondary = Color.White,
+    onSecondary = MinimalOnSecondary,
     secondaryContainer = MinimalSecondaryContainer,
     onSecondaryContainer = MinimalOnSecondaryContainer,
-    tertiary = MinimalBluePrimary,
+    tertiary = GoldenOchre,
+    onTertiary = Color.White,
     background = MinimalBackground,
     surface = MinimalSurface,
     surfaceVariant = MinimalSurfaceVariant,
@@ -49,7 +58,7 @@ private val LightColorScheme = lightColorScheme(
     error = MinimalAlert,
     errorContainer = MinimalAlertContainer,
     onError = Color.White,
-    onErrorContainer = Color(0xFF410002)
+    onErrorContainer = MinimalOnAlertContainer
 )
 
 @Composable

@@ -447,7 +447,10 @@ fun DeliveryScreen(
                             .height(54.dp)
                             .testTag("btn_confirm_delivery"),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))

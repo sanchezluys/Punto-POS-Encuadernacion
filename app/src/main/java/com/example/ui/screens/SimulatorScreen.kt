@@ -53,6 +53,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -144,26 +145,72 @@ fun SimulatorScreen(
                 Text(
                     text = "Prueba materiales, texturas con la cámara y grabado en pan de oro en 3D.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                 )
 
-                // 3D Canvas Viewer with Dynamic Texture & Color
-                Book3DViewer(
+                // 3D Canvas Viewer Card with Title & Texture Info
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(320.dp)
-                        .testTag("simulator_3d_viewer"),
-                    bindingType = simulatorBinding,
-                    coverColor = Color(coverColorHex),
-                    customTextureBitmap = customBitmap,
-                    foilTitle = foilTitle,
-                    foilSubtitle = foilSubtitle,
-                    foilColorType = foilColor,
-                    hasRibbon = hasRibbon,
-                    hasCornerGuards = hasCorners,
-                    showControls = true
-                )
+                        .testTag("simulator_3d_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = simulatorBinding.name,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (customBitmap != null) "Textura personalizada aplicada" else "Visualización en vivo 360°",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (customBitmap != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer
+                            ) {
+                                Text(
+                                    text = simulatorBinding.spineType.name.replace("_", " "),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Book3DViewer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(320.dp)
+                                .testTag("simulator_3d_viewer"),
+                            bindingType = simulatorBinding,
+                            coverColor = Color(coverColorHex),
+                            customTextureBitmap = customBitmap,
+                            foilTitle = foilTitle,
+                            foilSubtitle = foilSubtitle,
+                            foilColorType = foilColor,
+                            hasRibbon = hasRibbon,
+                            hasCornerGuards = hasCorners,
+                            showControls = true
+                        )
+                    }
+                }
             }
         }
 
@@ -181,7 +228,8 @@ fun SimulatorScreen(
                     Text(
                         text = "1. Estructura de Encuadernación",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(
@@ -193,13 +241,28 @@ fun SimulatorScreen(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { viewModel.setSimulatorBinding(binding) },
-                                label = { Text(binding.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                label = {
+                                    Text(
+                                        text = binding.name,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
                                 leadingIcon = if (isSelected) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 } else null,
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                         }
@@ -228,12 +291,13 @@ fun SimulatorScreen(
                             Text(
                                 text = "2. Texturas Reales & Cámara",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Aplica fotos reales de telas o papeles a la tapa 3D",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -271,7 +335,10 @@ fun SimulatorScreen(
                                 .weight(1f)
                                 .testTag("btn_capture_texture_camera"),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Terracotta)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
                             Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -283,7 +350,10 @@ fun SimulatorScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("btn_pick_texture_gallery"),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
                         ) {
                             Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -297,7 +367,7 @@ fun SimulatorScreen(
                         text = "Muestrario de Materiales Típicos:",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -317,7 +387,7 @@ fun SimulatorScreen(
                                     .clickable { viewModel.applyPresetTexture(preset) }
                                     .border(
                                         width = if (isSelected) 2.5.dp else 1.dp,
-                                        color = if (isSelected) GoldenOchre else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                         shape = RoundedCornerShape(12.dp)
                                     ),
                                 color = MaterialTheme.colorScheme.surfaceVariant
@@ -335,12 +405,13 @@ fun SimulatorScreen(
                                         text = preset.name,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1
                                     )
                                     Text(
                                         text = preset.description,
                                         fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1
                                     )
                                 }
@@ -353,6 +424,22 @@ fun SimulatorScreen(
 
         // 3. COLOR PALETTE SWATCHES
         item {
+            val artisanColors = listOf(
+                0xFF4A2A18 to "Saddle Brown",
+                0xFF2C1810 to "Marrón Ébano",
+                0xFF2D5A43 to "Verde Esmeralda",
+                0xFF1B3B2B to "Verde Botella",
+                0xFF6D213C to "Vino Borgoña",
+                0xFF1C2D42 to "Azul Marino",
+                0xFF3E4E59 to "Gris Pizarra",
+                0xFFB85D38 to "Terracota",
+                0xFFD4A017 to "Ocre Dorado",
+                0xFF8C6422 to "Cuero Mostaza",
+                0xFF1C1B1F to "Negro Carbón",
+                0xFFFAF6EE to "Pergamino Claro"
+            )
+            val selectedColorName = artisanColors.find { it.first == coverColorHex }?.second ?: "Color Personalizado"
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -362,27 +449,31 @@ fun SimulatorScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "3. Paleta de Color de Cubierta",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "3. Color de Cubierta",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = selectedColorName,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(10.dp))
-
-                    val artisanColors = listOf(
-                        0xFF4A2A18 to "Saddle Brown",
-                        0xFF2C1810 to "Marrón Ébano",
-                        0xFF2D5A43 to "Verde Esmeralda",
-                        0xFF1B3B2B to "Verde Botella",
-                        0xFF6D213C to "Vino Borgoña",
-                        0xFF1C2D42 to "Azul Marino",
-                        0xFF3E4E59 to "Gris Pizarra",
-                        0xFFB85D38 to "Terracota",
-                        0xFFD4A017 to "Ocre Dorado",
-                        0xFF8C6422 to "Cuero Mostaza",
-                        0xFF1C1B1F to "Negro Carbón",
-                        0xFFFAF6EE to "Pergamino Claro"
-                    )
 
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -393,12 +484,12 @@ fun SimulatorScreen(
                             val isColorSelected = (coverColorHex == colorLong)
                             Box(
                                 modifier = Modifier
-                                    .size(38.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
                                     .background(Color(colorLong))
                                     .border(
-                                        width = if (isColorSelected) 3.dp else 1.dp,
-                                        color = if (isColorSelected) MaterialTheme.colorScheme.primary else Color(0xFFE1E2EC),
+                                        width = if (isColorSelected) 3.dp else 1.5.dp,
+                                        color = if (isColorSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                         shape = CircleShape
                                     )
                                     .clickable {
@@ -432,28 +523,71 @@ fun SimulatorScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "4. Estampado & Grabado en Tapa",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "4. Estampado & Grabado en Tapa",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Opcional: escribe para estampar en la tapa 3D",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (foilTitle.isNotEmpty() || foilSubtitle.isNotEmpty()) {
+                            TextButton(
+                                onClick = {
+                                    viewModel.setSimulatorFoilTitle("")
+                                    viewModel.setSimulatorFoilSubtitle("")
+                                }
+                            ) {
+                                Text("Limpiar", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Foil Color Selector
+                    // Foil Color Selector Chips with High Contrast
+                    val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
+                    val onSecondaryContainerColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    val foilOptions = listOf(
+                        "Dorado" to (Color(0xFFE5B83B) to Color(0xFF261D00)),
+                        "Plateado" to (Color(0xFFCFD5DC) to Color(0xFF191C20)),
+                        "Cobre" to (Color(0xFFD9724C) to Color(0xFF2E0E05)),
+                        "Golpe Seco" to (secondaryContainerColor to onSecondaryContainerColor)
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("Dorado", "Plateado", "Cobre", "Golpe Seco").forEach { type ->
+                        foilOptions.forEach { (type, colorPair) ->
                             val isFoilSelected = foilColor == type
                             FilterChip(
                                 selected = isFoilSelected,
                                 onClick = { viewModel.setSimulatorFoilColor(type) },
-                                label = { Text(type, fontSize = 12.sp) },
+                                label = {
+                                    Text(
+                                        text = type,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isFoilSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isFoilSelected) colorPair.second else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
                                 modifier = Modifier.weight(1f),
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = if (type == "Dorado") FoilGold else if (type == "Plateado") FoilSilver else MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = Color.Black
+                                    selectedContainerColor = colorPair.first,
+                                    selectedLabelColor = colorPair.second,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                         }
@@ -465,6 +599,7 @@ fun SimulatorScreen(
                         value = foilTitle,
                         onValueChange = { viewModel.setSimulatorFoilTitle(it) },
                         label = { Text("Título grabado en la tapa") },
+                        placeholder = { Text("Ej: Mi Diario Artesanal") },
                         modifier = Modifier.fillMaxWidth().testTag("input_foil_title"),
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp)
@@ -476,6 +611,7 @@ fun SimulatorScreen(
                         value = foilSubtitle,
                         onValueChange = { viewModel.setSimulatorFoilSubtitle(it) },
                         label = { Text("Subtítulo / Autor / Fecha") },
+                        placeholder = { Text("Ej: 2026 • Edición Limitada") },
                         modifier = Modifier.fillMaxWidth().testTag("input_foil_subtitle"),
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp)
@@ -498,7 +634,8 @@ fun SimulatorScreen(
                     Text(
                         text = "5. Herrajes & Accesorios",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -507,7 +644,12 @@ fun SimulatorScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Cinta señaladora de raso", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "Cinta señaladora de raso",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Switch(
                             checked = hasRibbon,
                             onCheckedChange = { viewModel.setSimulatorHasRibbon(it) },
@@ -523,7 +665,12 @@ fun SimulatorScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Esquineros metálicos de protección", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "Esquineros metálicos de protección",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Switch(
                             checked = hasCorners,
                             onCheckedChange = { viewModel.setSimulatorHasCorners(it) },
@@ -547,7 +694,10 @@ fun SimulatorScreen(
                     .padding(horizontal = 16.dp)
                     .testTag("btn_proceed_to_quote_from_simulator"),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
                 Icon(Icons.Default.Calculate, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

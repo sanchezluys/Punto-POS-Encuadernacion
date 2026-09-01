@@ -403,12 +403,12 @@ fun QuotationScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Descuento Especial Adicional:", style = MaterialTheme.typography.bodySmall)
+                        Text("Descuento Especial Adicional:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             text = "${customDiscount.toInt()}%",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
-                            color = Terracotta
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -417,7 +417,10 @@ fun QuotationScreen(
                         onValueChange = { viewModel.setQuoteCustomDiscount(it.toDouble()) },
                         valueRange = 0f..30f,
                         steps = 5,
-                        colors = SliderDefaults.colors(thumbColor = Terracotta, activeTrackColor = Terracotta)
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                 }
             }
@@ -680,13 +683,13 @@ fun CostLine(label: String, amount: Double, isBold: Boolean = false) {
             text = label,
             fontSize = 13.sp,
             fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-            color = LeatherDark.copy(alpha = 0.85f)
+            color = if (isBold) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = "$${String.format(java.util.Locale.US, "%.2f", amount)}",
             fontSize = 13.sp,
             fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
-            color = LeatherDark
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

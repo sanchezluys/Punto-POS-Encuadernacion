@@ -92,10 +92,10 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     private val _simulatorCustomBitmap = MutableStateFlow<Bitmap?>(null)
     val simulatorCustomBitmap: StateFlow<Bitmap?> = _simulatorCustomBitmap.asStateFlow()
 
-    private val _simulatorFoilTitle = MutableStateFlow("OBRA MAESTRA")
+    private val _simulatorFoilTitle = MutableStateFlow("")
     val simulatorFoilTitle: StateFlow<String> = _simulatorFoilTitle.asStateFlow()
 
-    private val _simulatorFoilSubtitle = MutableStateFlow("TALLER ARTESANAL")
+    private val _simulatorFoilSubtitle = MutableStateFlow("")
     val simulatorFoilSubtitle: StateFlow<String> = _simulatorFoilSubtitle.asStateFlow()
 
     private val _simulatorFoilColor = MutableStateFlow("Dorado") // Dorado, Plateado, Cobre, Golpe Seco

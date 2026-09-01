@@ -137,10 +137,18 @@ fun OrdersScreen(
                     FilterChip(
                         selected = statusFilter == null,
                         onClick = { viewModel.setOrderStatusFilter(null) },
-                        label = { Text("Todos (${orders.size})") },
+                        label = {
+                            Text(
+                                text = "Todos (${orders.size})",
+                                fontWeight = if (statusFilter == null) FontWeight.Bold else FontWeight.Normal,
+                                color = if (statusFilter == null) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = SaddleBrown,
-                            selectedLabelColor = Color.White
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -151,10 +159,18 @@ fun OrdersScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.setOrderStatusFilter(if (isSelected) null else status) },
-                        label = { Text("${status.displayName} ($count)") },
+                        label = {
+                            Text(
+                                text = "${status.displayName} ($count)",
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = SaddleBrown,
-                            selectedLabelColor = Color.White
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -180,25 +196,29 @@ fun OrdersScreen(
                         Icon(
                             imageVector = Icons.Default.ReceiptLong,
                             contentDescription = null,
-                            tint = SaddleBrown.copy(alpha = 0.5f),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(56.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = "No hay pedidos en esta categoría",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "Crea un nuevo presupuesto desde el Cotizador.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = { viewModel.navigateTo(AppNavScreen.COTIZADOR) },
-                            colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
                             Text("Ir al Cotizador")
                         }
@@ -290,13 +310,13 @@ fun OrderCard(
                         text = order.orderNumber,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = SaddleBrown
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "• ${df.format(Date(order.createdAt))}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 

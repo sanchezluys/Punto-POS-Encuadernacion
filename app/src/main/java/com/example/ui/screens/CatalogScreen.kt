@@ -94,58 +94,117 @@ fun CatalogScreen(
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                 )
 
-                // 3D Canvas Box
-                Book3DViewer(
+                // 3D Showcase Card with Title and Details
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(310.dp)
-                        .testTag("catalog_3d_viewer"),
-                    bindingType = selectedBinding,
-                    coverColor = Color(selectedBinding.defaultColorHex),
-                    foilTitle = selectedBinding.name.uppercase(),
-                    foilSubtitle = selectedBinding.subtitle.uppercase(),
-                    foilColorType = "Dorado",
-                    hasRibbon = selectedBinding.hasRibbon,
-                    hasCornerGuards = selectedBinding.hasCornerGuards,
-                    showControls = true
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Action buttons for currently viewed 3D book
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .testTag("catalog_3d_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.setSimulatorBinding(selectedBinding)
-                            viewModel.navigateTo(AppNavScreen.SIMULADOR)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("btn_customize_in_simulator"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SaddleBrown)
-                    ) {
-                        Icon(imageVector = Icons.Default.ColorLens, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Simulador", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                    }
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        // Card Title: Name of the selected Binding
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.MenuBook,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = selectedBinding.name,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Text(
+                                    text = selectedBinding.subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 24.dp, top = 2.dp)
+                                )
+                            }
 
-                    Button(
-                        onClick = {
-                            viewModel.prepareQuotationFromCatalog(selectedBinding)
-                        },
-                        modifier = Modifier
-                            .weight(1.3f)
-                            .testTag("btn_quote_selected_binding"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown)
-                    ) {
-                        Icon(imageVector = Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Cotizar Modelo", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            // Spine badge
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                            ) {
+                                Text(
+                                    text = selectedBinding.spineType.name.replace("_", " "),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // 3D Canvas Box (No text on the cover itself)
+                        Book3DViewer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(310.dp)
+                                .testTag("catalog_3d_viewer"),
+                            bindingType = selectedBinding,
+                            coverColor = Color(selectedBinding.defaultColorHex),
+                            foilTitle = "",
+                            foilSubtitle = "",
+                            foilColorType = "Dorado",
+                            hasRibbon = selectedBinding.hasRibbon,
+                            hasCornerGuards = selectedBinding.hasCornerGuards,
+                            showControls = true
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Action buttons for currently viewed 3D book
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.setSimulatorBinding(selectedBinding)
+                                    viewModel.navigateTo(AppNavScreen.SIMULADOR)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_customize_in_simulator"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(imageVector = Icons.Default.ColorLens, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Simulador", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    viewModel.prepareQuotationFromCatalog(selectedBinding)
+                                },
+                                modifier = Modifier
+                                    .weight(1.3f)
+                                    .testTag("btn_quote_selected_binding"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(imageVector = Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Cotizar Modelo", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
                     }
                 }
             }
@@ -214,12 +273,12 @@ fun CatalogScreen(
 
                         // Base price badge
                         Surface(
-                            color = SaddleBrown.copy(alpha = 0.12f),
+                            color = MaterialTheme.colorScheme.primaryContainer,
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 text = "Desde $${String.format(java.util.Locale.US, "%.2f", binding.basePrice)}",
-                                color = SaddleBrown,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -232,7 +291,7 @@ fun CatalogScreen(
                     Text(
                         text = binding.description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 20.sp
                     )
 
@@ -256,8 +315,8 @@ fun CatalogScreen(
                     Text(
                         text = "Ideal para: " + binding.recommendedUses.joinToString(", "),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Terracotta,
-                        fontWeight = FontWeight.Medium
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.SemiBold
                     )
 
                     if (!isSelected) {
@@ -288,14 +347,14 @@ fun SpecBadge(label: String, value: String) {
             Text(
                 text = "$label: ",
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = value,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }

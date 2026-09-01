@@ -8,23 +8,32 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -104,9 +113,9 @@ data class Point3D(val x: Float, val y: Float, val z: Float) {
         )
     }
 
-    fun project(centerX: Float, centerY: Float, fov: Float = 600f): Offset {
+    fun project(centerX: Float, centerY: Float, fov: Float = 600f, zoomScale: Float = 1.0f): Offset {
         val distance = fov + z
-        val scale = if (distance > 10f) fov / distance else 1f
+        val scale = (if (distance > 10f) fov / distance else 1f) * zoomScale
         return Offset(centerX + x * scale, centerY + y * scale)
     }
 }
@@ -129,6 +138,7 @@ fun Book3DViewer(
 ) {
     var yawDeg by remember { mutableFloatStateOf(initialYaw) }
     var pitchDeg by remember { mutableFloatStateOf(initialPitch) }
+    var zoomScale by remember { mutableFloatStateOf(1.0f) }
     var openAngleDeg by remember { mutableFloatStateOf(0f) }
     var isAutoRotating by remember { mutableStateOf(false) }
 
@@ -142,7 +152,7 @@ fun Book3DViewer(
 
     val animatedOpenAngle by animateFloatAsState(
         targetValue = openAngleDeg,
-        animationSpec = tween(durationMillis = 350),
+        animationSpec = tween(durationMillis = 300),
         label = "openAngle"
     )
 
@@ -159,12 +169,22 @@ fun Book3DViewer(
                 )
             )
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
+                detectTransformGestures { _, pan, zoom, _ ->
                     isAutoRotating = false
-                    yawDeg += dragAmount.x * 0.5f
-                    pitchDeg = (pitchDeg - dragAmount.y * 0.4f).coerceIn(-65f, 65f)
+                    zoomScale = (zoomScale * zoom).coerceIn(0.55f, 2.4f)
+                    yawDeg += pan.x * 0.45f
+                    pitchDeg = (pitchDeg - pan.y * 0.4f).coerceIn(-75f, 75f)
                 }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        zoomScale = 1.0f
+                        yawDeg = initialYaw
+                        pitchDeg = initialPitch
+                        isAutoRotating = false
+                    }
+                )
             }
             .testTag("book_3d_canvas_container")
     ) {
@@ -177,6 +197,7 @@ fun Book3DViewer(
                 centerY = cy,
                 yawDeg = yawDeg,
                 pitchDeg = pitchDeg,
+                zoomScale = zoomScale,
                 openAngleDeg = animatedOpenAngle,
                 bindingType = bindingType,
                 coverColor = coverColor,
@@ -195,7 +216,7 @@ fun Book3DViewer(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp),
+                    .padding(10.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Top Action Bar inside 3D viewer
@@ -204,9 +225,11 @@ fun Book3DViewer(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Interaction guidance pill with current Zoom display
                     Surface(
-                        color = Color.White.copy(alpha = 0.92f),
+                        color = Color.White.copy(alpha = 0.94f),
                         shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE1E2EC)),
                         modifier = Modifier.padding(2.dp)
                     ) {
                         Row(
@@ -217,66 +240,113 @@ fun Book3DViewer(
                                 imageVector = Icons.Default.Visibility,
                                 contentDescription = "3D Realtime",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = " 3D Interactivo • Arrastra para girar",
+                                text = "Giro 360° • Zoom ${(zoomScale * 100).toInt()}%",
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Floating 3D Action Tools
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Zoom Out Button
+                        IconButton(
+                            onClick = {
+                                zoomScale = (zoomScale - 0.2f).coerceIn(0.55f, 2.4f)
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.94f), CircleShape)
+                                .border(1.dp, Color(0xFFE1E2EC), CircleShape)
+                                .testTag("btn_zoom_out")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "Alejar Zoom",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Zoom In Button
+                        IconButton(
+                            onClick = {
+                                zoomScale = (zoomScale + 0.2f).coerceIn(0.55f, 2.4f)
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.94f), CircleShape)
+                                .border(1.dp, Color(0xFFE1E2EC), CircleShape)
+                                .testTag("btn_zoom_in")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Acercar Zoom",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
                         // Auto-spin toggle
                         IconButton(
                             onClick = { isAutoRotating = !isAutoRotating },
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .background(
-                                    if (isAutoRotating) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = 0.92f),
+                                    if (isAutoRotating) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = 0.94f),
                                     CircleShape
                                 )
+                                .border(1.dp, if (isAutoRotating) MaterialTheme.colorScheme.primary else Color(0xFFE1E2EC), CircleShape)
                                 .testTag("btn_auto_rotate")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AutoMode,
                                 contentDescription = "Auto Giro",
-                                tint = if (isAutoRotating) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                tint = if (isAutoRotating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
 
-                        // Reset View
+                        // Reset View & Zoom
                         IconButton(
                             onClick = {
-                                yawDeg = -25f
-                                pitchDeg = 15f
+                                yawDeg = initialYaw
+                                pitchDeg = initialPitch
+                                zoomScale = 1.0f
                                 isAutoRotating = false
                             },
                             modifier = Modifier
-                                .size(36.dp)
-                                .background(Color.White.copy(alpha = 0.92f), CircleShape)
+                                .size(32.dp)
+                                .background(Color.White.copy(alpha = 0.94f), CircleShape)
+                                .border(1.dp, Color(0xFFE1E2EC), CircleShape)
                                 .testTag("btn_reset_view")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.RestartAlt,
                                 contentDescription = "Reset Vista",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
                 }
 
-                // Bottom control panel for Book Opening Angle
+                // Bottom control panel for Book Opening Angle & Presets
                 Surface(
-                    color = Color.White.copy(alpha = 0.92f),
+                    color = Color.White.copy(alpha = 0.95f),
                     shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE1E2EC)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -287,21 +357,40 @@ fun Book3DViewer(
                                     imageVector = Icons.Default.MenuBook,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = " Apertura del Libro: ${openAngleDeg.toInt()}°",
+                                    text = "Apertura: ${openAngleDeg.toInt()}°",
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            Text(
-                                text = if (openAngleDeg == 0f) "Cerrado" else if (openAngleDeg < 90f) "Semi-abierto" else "Abierto",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+
+                            // Quick preset tags
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                listOf(
+                                    "Cerrado" to 0f,
+                                    "45°" to 45f,
+                                    "100°" to 100f
+                                ).forEach { (label, deg) ->
+                                    val isCurrent = (openAngleDeg == deg)
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else Color(0xFFF3F3FA),
+                                        modifier = Modifier.clickable { openAngleDeg = deg }
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         Slider(
@@ -313,7 +402,7 @@ fun Book3DViewer(
                                 activeTrackColor = MaterialTheme.colorScheme.primary,
                                 inactiveTrackColor = MaterialTheme.colorScheme.primaryContainer
                             ),
-                            modifier = Modifier.height(28.dp).testTag("slider_open_angle")
+                            modifier = Modifier.height(24.dp).testTag("slider_open_angle")
                         )
                     }
                 }
@@ -327,6 +416,7 @@ private fun DrawScope.draw3DBook(
     centerY: Float,
     yawDeg: Float,
     pitchDeg: Float,
+    zoomScale: Float,
     openAngleDeg: Float,
     bindingType: BindingType,
     coverColor: Color,
@@ -353,20 +443,22 @@ private fun DrawScope.draw3DBook(
     }
 
     fun proj(p: Point3D): Offset {
-        return tr(p).project(centerX, centerY, 550f)
+        return tr(p).project(centerX, centerY, 580f, zoomScale)
     }
 
-    // Shadow on surface
-    val shadowCenter = Point3D(0f, bookHeight / 2f + 40f, 0f)
+    // Shadow on surface under the book
+    val shadowCenter = Point3D(0f, bookHeight / 2f + 36f, 0f)
     val shadowProj = proj(shadowCenter)
+    val shadowW = 320f * zoomScale
+    val shadowH = 80f * zoomScale
     drawOval(
         brush = Brush.radialGradient(
-            colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent),
+            colors = listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent),
             center = shadowProj,
-            radius = 180f
+            radius = shadowW / 2f
         ),
-        topLeft = Offset(shadowProj.x - 170f, shadowProj.y - 45f),
-        size = Size(340f, 90f)
+        topLeft = Offset(shadowProj.x - shadowW / 2f, shadowProj.y - shadowH / 2f),
+        size = Size(shadowW, shadowH)
     )
 
     // Lighting vector (directional light from top-left-front)
@@ -393,7 +485,6 @@ private fun DrawScope.draw3DBook(
     // 3. Front Cover Coordinates (with open angle rotation around spine hinge at x = -bookWidth/2)
     val openRad = (-openAngleDeg * PI / 180f).toFloat()
     fun rotateCoverPoint(localX: Float, y: Float, z: Float): Point3D {
-        // Spine hinge is at (-bookWidth/2, z)
         val hingeX = -bookWidth / 2f
         val relX = localX - hingeX
         val rotatedRelX = relX * cos(openRad)
@@ -428,16 +519,57 @@ private fun DrawScope.draw3DBook(
     polygons.add(
         Poly3D("back_cover", listOf(backTL, backTR, backBR, backBL)) {
             val p = Path().apply {
-                val pt0 = proj(backTL)
-                moveTo(pt0.x, pt0.y)
+                val pt0 = proj(backTL); moveTo(pt0.x, pt0.y)
                 val pt1 = proj(backTR); lineTo(pt1.x, pt1.y)
                 val pt2 = proj(backBR); lineTo(pt2.x, pt2.y)
                 val pt3 = proj(backBL); lineTo(pt3.x, pt3.y)
                 close()
             }
-            drawPath(p, color = coverColor.copy(alpha = 0.9f))
-            drawPath(p, color = Color.Black.copy(alpha = 0.35f))
-            drawPath(p, color = Color.White.copy(alpha = 0.15f), style = Stroke(width = 1.5f))
+
+            if (customTextureBitmap != null && !customTextureBitmap.isRecycled) {
+                drawIntoCanvas { canvas ->
+                    val androidPath = android.graphics.Path().apply {
+                        val pt0 = proj(backTL); moveTo(pt0.x, pt0.y)
+                        val pt1 = proj(backTR); lineTo(pt1.x, pt1.y)
+                        val pt2 = proj(backBR); lineTo(pt2.x, pt2.y)
+                        val pt3 = proj(backBL); lineTo(pt3.x, pt3.y)
+                        close()
+                    }
+
+                    canvas.nativeCanvas.save()
+                    canvas.nativeCanvas.clipPath(androidPath)
+
+                    val bmpW = customTextureBitmap.width.toFloat()
+                    val bmpH = customTextureBitmap.height.toFloat()
+                    val src = floatArrayOf(0f, 0f, bmpW, 0f, bmpW, bmpH, 0f, bmpH)
+                    val pt0 = proj(backTL)
+                    val pt1 = proj(backTR)
+                    val pt2 = proj(backBR)
+                    val pt3 = proj(backBL)
+                    val dst = floatArrayOf(pt0.x, pt0.y, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y)
+
+                    val matrix = Matrix()
+                    val mapped = matrix.setPolyToPoly(src, 0, dst, 0, 4)
+                    if (!mapped) {
+                        matrix.setPolyToPoly(src, 0, dst, 0, 3)
+                    }
+
+                    val paint = NativePaint().apply {
+                        isAntiAlias = true
+                        isFilterBitmap = true
+                        isDither = true
+                    }
+
+                    canvas.nativeCanvas.drawBitmap(customTextureBitmap, matrix, paint)
+                    canvas.nativeCanvas.restore()
+                }
+                drawPath(p, color = coverColor.copy(alpha = 0.18f))
+                drawPath(p, color = Color.Black.copy(alpha = 0.35f))
+            } else {
+                drawPath(p, color = coverColor.copy(alpha = 0.9f))
+                drawPath(p, color = Color.Black.copy(alpha = 0.35f))
+            }
+            drawPath(p, color = Color.White.copy(alpha = 0.15f), style = Stroke(width = 1.5f * zoomScale))
         }
     )
 
@@ -451,7 +583,6 @@ private fun DrawScope.draw3DBook(
                 val pt3 = proj(pageBR); lineTo(pt3.x, pt3.y)
                 close()
             }
-            // Cream / ahuesado paper page edge shading
             drawPath(
                 p,
                 brush = Brush.linearGradient(
@@ -463,7 +594,7 @@ private fun DrawScope.draw3DBook(
                     )
                 )
             )
-            // Draw subtle page line stripes
+            // Page line stripes
             val pTop = proj(pageTR)
             val pBottom = proj(pageBR)
             val pBackTop = proj(pageBackTR)
@@ -482,7 +613,7 @@ private fun DrawScope.draw3DBook(
                     color = Color(0xFFB5A486).copy(alpha = 0.6f),
                     start = start,
                     end = end,
-                    strokeWidth = 1f
+                    strokeWidth = 1f * zoomScale
                 )
             }
         }
@@ -548,24 +679,23 @@ private fun DrawScope.draw3DBook(
                 // First interior page / flyleaf
                 drawPath(p, color = Color(0xFFF9F5EB))
 
-                // Endpaper Marbled or artisan illustration texture
                 val p0 = proj(pageTL)
                 val p1 = proj(pageTR)
                 val p2 = proj(pageBR)
                 val p3 = proj(pageBL)
 
-                // Simulated text/grid lines on open book page
+                // Simulated text lines on open book page
                 for (j in 3..14) {
                     val lineFrac = j / 18f
-                    val lx1 = p0.x + (p3.x - p0.x) * lineFrac + 15f
+                    val lx1 = p0.x + (p3.x - p0.x) * lineFrac + (12f * zoomScale)
                     val ly1 = p0.y + (p3.y - p0.y) * lineFrac
-                    val lx2 = p1.x + (p2.x - p1.x) * lineFrac - 15f
+                    val lx2 = p1.x + (p2.x - p1.x) * lineFrac - (12f * zoomScale)
                     val ly2 = p1.y + (p2.y - p1.y) * lineFrac
                     drawLine(
                         color = Color(0xFF8B7D6B).copy(alpha = 0.35f),
                         start = Offset(lx1, ly1),
                         end = Offset(lx2, ly2),
-                        strokeWidth = 1.5f
+                        strokeWidth = 1.5f * zoomScale
                     )
                 }
             }
@@ -583,24 +713,63 @@ private fun DrawScope.draw3DBook(
                 close()
             }
 
-            // Spine color with realistic cylinder lighting
-            drawPath(
-                p,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        coverColor.copy(alpha = 0.85f),
-                        coverColor,
-                        coverColor.copy(alpha = 0.6f)
-                    ),
-                    start = proj(spineTL),
-                    end = proj(spineTR)
+            if (customTextureBitmap != null && !customTextureBitmap.isRecycled) {
+                drawIntoCanvas { canvas ->
+                    val androidPath = android.graphics.Path().apply {
+                        val pt0 = proj(spineTL); moveTo(pt0.x, pt0.y)
+                        val pt1 = proj(spineTR); lineTo(pt1.x, pt1.y)
+                        val pt2 = proj(spineBR); lineTo(pt2.x, pt2.y)
+                        val pt3 = proj(spineBL); lineTo(pt3.x, pt3.y)
+                        close()
+                    }
+
+                    canvas.nativeCanvas.save()
+                    canvas.nativeCanvas.clipPath(androidPath)
+
+                    val bmpW = customTextureBitmap.width.toFloat()
+                    val bmpH = customTextureBitmap.height.toFloat()
+                    val src = floatArrayOf(0f, 0f, bmpW, 0f, bmpW, bmpH, 0f, bmpH)
+                    val pt0 = proj(spineTL)
+                    val pt1 = proj(spineTR)
+                    val pt2 = proj(spineBR)
+                    val pt3 = proj(spineBL)
+                    val dst = floatArrayOf(pt0.x, pt0.y, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y)
+
+                    val matrix = Matrix()
+                    val mapped = matrix.setPolyToPoly(src, 0, dst, 0, 4)
+                    if (!mapped) {
+                        matrix.setPolyToPoly(src, 0, dst, 0, 3)
+                    }
+
+                    val paint = NativePaint().apply {
+                        isAntiAlias = true
+                        isFilterBitmap = true
+                        isDither = true
+                    }
+
+                    canvas.nativeCanvas.drawBitmap(customTextureBitmap, matrix, paint)
+                    canvas.nativeCanvas.restore()
+                }
+                drawPath(p, color = coverColor.copy(alpha = 0.18f))
+            } else {
+                // Spine color with realistic cylinder lighting
+                drawPath(
+                    p,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            coverColor.copy(alpha = 0.85f),
+                            coverColor,
+                            coverColor.copy(alpha = 0.6f)
+                        ),
+                        start = proj(spineTL),
+                        end = proj(spineTR)
+                    )
                 )
-            )
+            }
 
             // Specialized Spine details based on Binding Style
             when (bindingType.spineType) {
                 SpineType.EXPOSED_COPTIC -> {
-                    // Draw exposed multi-needle coptic stitches
                     val spTop = proj(spineTL)
                     val spBottom = proj(spineBL)
                     val spRightTop = proj(spineTR)
@@ -613,25 +782,23 @@ private fun DrawScope.draw3DBook(
                         val sx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
                         val sy2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
 
-                        // Criss-cross braided stitch
                         drawLine(
                             color = Color(0xFFFAF0DD),
-                            start = Offset(sx1, sy1 - 4f),
-                            end = Offset(sx2, sy2 + 4f),
-                            strokeWidth = 3f,
+                            start = Offset(sx1, sy1 - 4f * zoomScale),
+                            end = Offset(sx2, sy2 + 4f * zoomScale),
+                            strokeWidth = 3f * zoomScale,
                             cap = StrokeCap.Round
                         )
                         drawLine(
                             color = Color(0xFFD4A017),
-                            start = Offset(sx1, sy1 + 4f),
-                            end = Offset(sx2, sy2 - 4f),
-                            strokeWidth = 2.5f,
+                            start = Offset(sx1, sy1 + 4f * zoomScale),
+                            end = Offset(sx2, sy2 - 4f * zoomScale),
+                            strokeWidth = 2.5f * zoomScale,
                             cap = StrokeCap.Round
                         )
                     }
                 }
                 SpineType.JAPANESE_STAB -> {
-                    // Draw 4-hole oriental stab binding cord
                     val spTop = proj(spineTL)
                     val spBottom = proj(spineBL)
                     for (h in 1..4) {
@@ -640,19 +807,18 @@ private fun DrawScope.draw3DBook(
                         val hy = spTop.y + (spBottom.y - spTop.y) * frac
                         drawCircle(
                             color = Color(0xFF1E1510),
-                            radius = 4f,
-                            center = Offset(hx + 12f, hy)
+                            radius = 4f * zoomScale,
+                            center = Offset(hx + 12f * zoomScale, hy)
                         )
                         drawLine(
                             color = Color(0xFFF3E5AB),
                             start = Offset(hx, hy),
-                            end = Offset(hx + 12f, hy),
-                            strokeWidth = 2.5f
+                            end = Offset(hx + 12f * zoomScale, hy),
+                            strokeWidth = 2.5f * zoomScale
                         )
                     }
                 }
                 SpineType.SPIRAL_WIRE -> {
-                    // Draw double metallic wire loops
                     val spTop = proj(spineTL)
                     val spBottom = proj(spineBL)
                     for (w in 1..14) {
@@ -661,14 +827,13 @@ private fun DrawScope.draw3DBook(
                         val wy = spTop.y + (spBottom.y - spTop.y) * frac
                         drawCircle(
                             color = FoilGold,
-                            radius = 5.5f,
-                            center = Offset(wx + 4f, wy),
-                            style = Stroke(width = 2.5f)
+                            radius = 5.5f * zoomScale,
+                            center = Offset(wx + 4f * zoomScale, wy),
+                            style = Stroke(width = 2.5f * zoomScale)
                         )
                     }
                 }
                 SpineType.ROUNDED, SpineType.FLAT -> {
-                    // Raised ribs (nervios en relieve) on leather/linen spine
                     val spTop = proj(spineTL)
                     val spBottom = proj(spineBL)
                     val spRightTop = proj(spineTR)
@@ -681,18 +846,17 @@ private fun DrawScope.draw3DBook(
                         val rx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
                         val ry2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
 
-                        // Raised rib highlight & shadow
                         drawLine(
                             color = Color.Black.copy(alpha = 0.5f),
-                            start = Offset(rx1, ry1 + 2f),
-                            end = Offset(rx2, ry2 + 2f),
-                            strokeWidth = 3.5f
+                            start = Offset(rx1, ry1 + 2f * zoomScale),
+                            end = Offset(rx2, ry2 + 2f * zoomScale),
+                            strokeWidth = 3.5f * zoomScale
                         )
                         drawLine(
                             color = Color.White.copy(alpha = 0.35f),
-                            start = Offset(rx1, ry1 - 1f),
-                            end = Offset(rx2, ry2 - 1f),
-                            strokeWidth = 2f
+                            start = Offset(rx1, ry1 - 1f * zoomScale),
+                            end = Offset(rx2, ry2 - 1f * zoomScale),
+                            strokeWidth = 2f * zoomScale
                         )
                     }
                 }
@@ -714,29 +878,45 @@ private fun DrawScope.draw3DBook(
             // If user took camera texture or selected custom bitmap
             if (customTextureBitmap != null && !customTextureBitmap.isRecycled) {
                 drawIntoCanvas { canvas ->
+                    val androidPath = android.graphics.Path().apply {
+                        val pt0 = proj(frontTL); moveTo(pt0.x, pt0.y)
+                        val pt1 = proj(frontTR); lineTo(pt1.x, pt1.y)
+                        val pt2 = proj(frontBR); lineTo(pt2.x, pt2.y)
+                        val pt3 = proj(frontBL); lineTo(pt3.x, pt3.y)
+                        close()
+                    }
+
+                    canvas.nativeCanvas.save()
+                    canvas.nativeCanvas.clipPath(androidPath)
+
+                    val bmpW = customTextureBitmap.width.toFloat()
+                    val bmpH = customTextureBitmap.height.toFloat()
+                    val src = floatArrayOf(0f, 0f, bmpW, 0f, bmpW, bmpH, 0f, bmpH)
+                    val pt0 = proj(frontTL)
+                    val pt1 = proj(frontTR)
+                    val pt2 = proj(frontBR)
+                    val pt3 = proj(frontBL)
+                    val dst = floatArrayOf(pt0.x, pt0.y, pt1.x, pt1.y, pt2.x, pt2.y, pt3.x, pt3.y)
+
+                    val matrix = Matrix()
+                    val mapped = matrix.setPolyToPoly(src, 0, dst, 0, 4)
+                    if (!mapped) {
+                        matrix.setPolyToPoly(src, 0, dst, 0, 3)
+                    }
+
                     val paint = NativePaint().apply {
                         isAntiAlias = true
-                        val shader = BitmapShader(customTextureBitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
-                        // Apply scale matrix to fit nicely
-                        val matrix = Matrix()
-                        val scale = 0.5f
-                        matrix.setScale(scale, scale)
-                        shader.setLocalMatrix(matrix)
-                        this.shader = shader
+                        isFilterBitmap = true
+                        isDither = true
                     }
-                    val androidPath = android.graphics.Path()
-                    val pt0 = proj(frontTL); androidPath.moveTo(pt0.x, pt0.y)
-                    val pt1 = proj(frontTR); androidPath.lineTo(pt1.x, pt1.y)
-                    val pt2 = proj(frontBR); androidPath.lineTo(pt2.x, pt2.y)
-                    val pt3 = proj(frontBL); androidPath.lineTo(pt3.x, pt3.y)
-                    androidPath.close()
 
-                    canvas.nativeCanvas.drawPath(androidPath, paint)
+                    canvas.nativeCanvas.drawBitmap(customTextureBitmap, matrix, paint)
+                    canvas.nativeCanvas.restore()
                 }
-                // Tint overlay with selected color
-                drawPath(p, color = coverColor.copy(alpha = 0.35f))
+                // Tint overlay with selected color for rich texture blending
+                drawPath(p, color = coverColor.copy(alpha = 0.18f))
             } else {
-                // Base material color with subtle leather grain gradient
+                // Base material color with rich artisan shading
                 drawPath(
                     p,
                     brush = Brush.linearGradient(
@@ -795,58 +975,62 @@ private fun DrawScope.draw3DBook(
                     "Cobre" -> Color(0xFFCB6D51)
                     else -> FoilGold.copy(alpha = 0.8f) // Dorado
                 },
-                style = Stroke(width = 2f, join = StrokeJoin.Round)
+                style = Stroke(width = 2f * zoomScale, join = StrokeJoin.Round)
             )
 
-            // Foil stamped Title & Subtitle in Real-Time 3D Projection!
-            val foilPaintColor = when (foilColorType) {
-                "Plateado" -> android.graphics.Color.rgb(230, 235, 240)
-                "Golpe Seco" -> android.graphics.Color.argb(120, 20, 10, 5)
-                "Cobre" -> android.graphics.Color.rgb(205, 127, 50)
-                else -> android.graphics.Color.rgb(255, 215, 0) // Gold
-            }
+            // ONLY draw Foil stamped Title & Subtitle when explicitly provided (clean book otherwise)
+            val titleToRender = foilTitle.trim()
+            val subtitleToRender = foilSubtitle.trim()
 
-            val titleToRender = if (foilTitle.isNotBlank()) foilTitle else bindingType.name
-            val subtitleToRender = if (foilSubtitle.isNotBlank()) foilSubtitle else "EDICIÓN ARTESANAL"
-
-            drawIntoCanvas { canvas ->
-                val centerCover = Offset(
-                    (inTL.x + inTR.x + inBR.x + inBL.x) / 4f,
-                    (inTL.y + inTR.y + inBR.y + inBL.y) / 4f
-                )
-
-                // Calculate rotation angle of the front cover on 2D screen
-                val dx = inTR.x - inTL.x
-                val dy = inTR.y - inTL.y
-                val rotationAngle = (Math.atan2(dy.toDouble(), dx.toDouble()) * 180 / Math.PI).toFloat()
-
-                canvas.nativeCanvas.save()
-                canvas.nativeCanvas.translate(centerCover.x, centerCover.y)
-                canvas.nativeCanvas.rotate(rotationAngle)
-
-                // Draw title
-                val textPaint = NativePaint().apply {
-                    color = foilPaintColor
-                    textSize = 34f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isFakeBoldText = true
-                    isAntiAlias = true
-                    setShadowLayer(3f, 1f, 1f, android.graphics.Color.argb(160, 0, 0, 0))
+            if (titleToRender.isNotEmpty() || subtitleToRender.isNotEmpty()) {
+                val foilPaintColor = when (foilColorType) {
+                    "Plateado" -> android.graphics.Color.rgb(230, 235, 240)
+                    "Golpe Seco" -> android.graphics.Color.argb(120, 20, 10, 5)
+                    "Cobre" -> android.graphics.Color.rgb(205, 127, 50)
+                    else -> android.graphics.Color.rgb(255, 215, 0) // Gold
                 }
-                canvas.nativeCanvas.drawText(titleToRender, 0f, -10f, textPaint)
 
-                // Draw subtitle
-                val subTextPaint = NativePaint().apply {
-                    color = foilPaintColor
-                    textSize = 18f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isAntiAlias = true
-                    letterSpacing = 0.2f
-                    setShadowLayer(2f, 1f, 1f, android.graphics.Color.argb(140, 0, 0, 0))
+                drawIntoCanvas { canvas ->
+                    val centerCover = Offset(
+                        (inTL.x + inTR.x + inBR.x + inBL.x) / 4f,
+                        (inTL.y + inTR.y + inBR.y + inBL.y) / 4f
+                    )
+
+                    val dx = inTR.x - inTL.x
+                    val dy = inTR.y - inTL.y
+                    val rotationAngle = (Math.atan2(dy.toDouble(), dx.toDouble()) * 180 / Math.PI).toFloat()
+
+                    canvas.nativeCanvas.save()
+                    canvas.nativeCanvas.translate(centerCover.x, centerCover.y)
+                    canvas.nativeCanvas.rotate(rotationAngle)
+
+                    if (titleToRender.isNotEmpty()) {
+                        val textPaint = NativePaint().apply {
+                            color = foilPaintColor
+                            textSize = 30f * zoomScale
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isFakeBoldText = true
+                            isAntiAlias = true
+                            setShadowLayer(3f * zoomScale, 1f, 1f, android.graphics.Color.argb(160, 0, 0, 0))
+                        }
+                        val yOffset = if (subtitleToRender.isNotEmpty()) -8f * zoomScale else 6f * zoomScale
+                        canvas.nativeCanvas.drawText(titleToRender, 0f, yOffset, textPaint)
+                    }
+
+                    if (subtitleToRender.isNotEmpty()) {
+                        val subTextPaint = NativePaint().apply {
+                            color = foilPaintColor
+                            textSize = 16f * zoomScale
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                            letterSpacing = 0.15f
+                            setShadowLayer(2f * zoomScale, 1f, 1f, android.graphics.Color.argb(140, 0, 0, 0))
+                        }
+                        canvas.nativeCanvas.drawText(subtitleToRender, 0f, 22f * zoomScale, subTextPaint)
+                    }
+
+                    canvas.nativeCanvas.restore()
                 }
-                canvas.nativeCanvas.drawText(subtitleToRender, 0f, 22f, subTextPaint)
-
-                canvas.nativeCanvas.restore()
             }
 
             // Metal Corner Guards (Esquineros de Bronce/Oro en las 4 esquinas)
@@ -867,11 +1051,10 @@ private fun DrawScope.draw3DBook(
                         close()
                     }
                     drawPath(cPath, color = cornerColor)
-                    drawPath(cPath, color = Color.Black.copy(alpha = 0.4f), style = Stroke(width = 1f))
-                    // Rivet dot
+                    drawPath(cPath, color = Color.Black.copy(alpha = 0.4f), style = Stroke(width = 1f * zoomScale))
                     drawCircle(
                         color = Color(0xFF4A2A18),
-                        radius = 2f,
+                        radius = 2f * zoomScale,
                         center = Offset(
                             pCorner.x + (p1.x - pCorner.x) * 0.09f + (p2.x - pCorner.x) * 0.09f,
                             pCorner.y + (p1.y - pCorner.y) * 0.09f + (p2.y - pCorner.y) * 0.09f
@@ -898,18 +1081,16 @@ private fun DrawScope.draw3DBook(
                 val rPath = Path().apply {
                     moveTo(topRibbon.x, topRibbon.y)
                     cubicTo(
-                        midRibbon.x - 20f, midRibbon.y - 40f,
-                        midRibbon.x + 30f, midRibbon.y + 40f,
+                        midRibbon.x - (20f * zoomScale), midRibbon.y - (40f * zoomScale),
+                        midRibbon.x + (30f * zoomScale), midRibbon.y + (40f * zoomScale),
                         bottomRibbon.x, bottomRibbon.y
                     )
                 }
-                // Ribbon shadow
                 drawPath(
                     rPath,
                     color = Color.Black.copy(alpha = 0.4f),
-                    style = Stroke(width = 9f, cap = StrokeCap.Round)
+                    style = Stroke(width = 9f * zoomScale, cap = StrokeCap.Round)
                 )
-                // Ribbon body
                 drawPath(
                     rPath,
                     brush = Brush.linearGradient(
@@ -919,7 +1100,7 @@ private fun DrawScope.draw3DBook(
                             ribbonColor
                         )
                     ),
-                    style = Stroke(width = 7f, cap = StrokeCap.Round)
+                    style = Stroke(width = 7f * zoomScale, cap = StrokeCap.Round)
                 )
             }
         )

@@ -98,8 +98,8 @@ fun InventoryScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
-                containerColor = SaddleBrown,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .padding(bottom = 75.dp)
                     .testTag("fab_add_material")
@@ -128,7 +128,7 @@ fun InventoryScreen(
                     Text(
                         text = "Control de stock de papeles, pieles, telas, herrajes e hilos del taller.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -145,14 +145,14 @@ fun InventoryScreen(
                         value = "${materials.size}",
                         subtitle = "artículos registrados",
                         modifier = Modifier.weight(1f),
-                        badgeColor = SaddleBrown
+                        badgeColor = MaterialTheme.colorScheme.primary
                     )
                     MetricBox(
                         title = "Alertas Stock",
                         value = "${lowStockItems.size}",
                         subtitle = "por debajo del mín.",
                         modifier = Modifier.weight(1f),
-                        badgeColor = if (lowStockItems.isNotEmpty()) Terracotta else ForestGreen
+                        badgeColor = if (lowStockItems.isNotEmpty()) MaterialTheme.colorScheme.error else ForestGreen
                     )
                     MetricBox(
                         title = "Valor Stock",
@@ -174,10 +174,18 @@ fun InventoryScreen(
                         FilterChip(
                             selected = selectedCategory == null,
                             onClick = { viewModel.setMaterialCategoryFilter(null) },
-                            label = { Text("Todos (${materials.size})") },
+                            label = {
+                                Text(
+                                    text = "Todos (${materials.size})",
+                                    fontWeight = if (selectedCategory == null) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selectedCategory == null) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SaddleBrown,
-                                selectedLabelColor = Color.White
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -188,10 +196,18 @@ fun InventoryScreen(
                         FilterChip(
                             selected = isSelected,
                             onClick = { viewModel.setMaterialCategoryFilter(if (isSelected) null else cat) },
-                            label = { Text("${cat.displayName} ($count)") },
+                            label = {
+                                Text(
+                                    text = "${cat.displayName} ($count)",
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SaddleBrown,
-                                selectedLabelColor = Color.White
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -266,11 +282,11 @@ fun MetricBox(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+            Text(text = title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = badgeColor)
             Spacer(modifier = Modifier.height(2.dp))
-            Text(text = subtitle, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
+            Text(text = subtitle, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -514,7 +530,10 @@ fun MaterialEditDialog(
                         onSave(item)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
                 Text("Guardar")
             }
