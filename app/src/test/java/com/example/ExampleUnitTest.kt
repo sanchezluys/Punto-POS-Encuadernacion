@@ -8,7 +8,6 @@ import com.example.data.model.OrderEntity
 import com.example.data.model.OrderStatus
 import com.example.data.model.PredefinedBindingTypes
 import com.example.data.model.QuoteCalculator
-import com.example.data.model.SpineThicknessCalculator
 import com.example.data.model.SpineType
 import com.example.data.model.WorkshopStep
 import org.junit.Assert.*
@@ -139,23 +138,6 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun testSpineThicknessCalculation() {
-    val thickness80g = SpineThicknessCalculator.calculateThicknessMm(
-      pageCount = 200,
-      paperWeightGsm = 80,
-      isHardcover = true
-    )
-    assertTrue("Grosor de lomo para 200 págs debe ser mayor a 8mm", thickness80g >= 8.0)
-
-    val thicknessWatercolor = SpineThicknessCalculator.calculateThicknessMm(
-      pageCount = 100,
-      paperWeightGsm = 300,
-      isHardcover = true
-    )
-    assertTrue("Papel acuarela de 300g debe ser más grueso por página", thicknessWatercolor > thickness80g * 0.5)
-  }
-
-  @Test
   fun testInventoryAlertsAndDefaults() {
     val defaults = DefaultMaterials.initialList
     assertTrue("Muestrario inicial de materiales debe tener elementos", defaults.isNotEmpty())
@@ -164,10 +146,10 @@ class ExampleUnitTest {
       id = 1,
       name = "Hilo de Lino Encerado 0.6mm",
       category = MaterialCategory.HILOS,
-      currentStock = 2.0,
-      minimumStock = 5.0,
       unit = "carretes",
-      costPerUnit = 4.50
+      unitCost = 4.50,
+      currentStock = 2.0,
+      minStockAlert = 5.0
     )
 
     assertTrue("Debe detectar alerta de bajo stock", lowStockItem.isLowStock)
@@ -175,11 +157,11 @@ class ExampleUnitTest {
     val regularStockItem = MaterialItem(
       id = 2,
       name = "Cartón Gris 2.5mm",
-      category = MaterialCategory.CARTON,
-      currentStock = 25.0,
-      minimumStock = 10.0,
+      category = MaterialCategory.CARTONES,
       unit = "pliegos",
-      costPerUnit = 2.80
+      unitCost = 2.80,
+      currentStock = 25.0,
+      minStockAlert = 10.0
     )
 
     assertFalse("No debe alertar con stock suficiente", regularStockItem.isLowStock)
@@ -190,8 +172,8 @@ class ExampleUnitTest {
     val order = OrderEntity(
       id = 101,
       orderNumber = "ORD-2026-001",
-      clientName = "Editorial Bellas Artes",
-      clientPhone = "+34 600 123 456",
+      customerName = "Editorial Bellas Artes",
+      customerPhone = "+34 600 123 456",
       bindingTypeId = "tapa_dura",
       bindingTypeName = "Tapa Dura Clásica",
       pageCount = 240,
@@ -199,24 +181,114 @@ class ExampleUnitTest {
       paperType = "Ahuesado 100g",
       coverMaterial = "Piel Cabra",
       coverColorHex = 0xFF4A2A18,
-      hasRibbon = true,
+      hasRibbonBookmark = true,
       hasMetalCorners = true,
-      hasFoilStamping = true,
       foilTitle = "Antología Poética",
       foilSubtitle = "2026",
       quantity = 5,
-      unitPrice = 45.0,
-      totalPrice = 225.0,
-      status = OrderStatus.PENDIENTE
+      totalAmount = 225.0,
+      status = OrderStatus.COTIZACION
     )
 
-    assertEquals(OrderStatus.PENDIENTE, order.status)
+    assertEquals(OrderStatus.COTIZACION, order.status)
     val confirmed = order.copy(status = OrderStatus.CONFIRMADO)
     assertEquals(OrderStatus.CONFIRMADO, confirmed.status)
     val inWorkshop = confirmed.copy(status = OrderStatus.EN_TALLER)
     assertEquals(OrderStatus.EN_TALLER, inWorkshop.status)
     val delivered = inWorkshop.copy(status = OrderStatus.ENTREGADO)
     assertEquals(OrderStatus.ENTREGADO, delivered.status)
+  }
+
+  @Test
+  fun testSpineAndDimensionCalculations() {
+    val formats = com.example.data.model.PredefinedBookFormats.list
+    assertTrue("Debe haber formatos predefinidos", formats.isNotEmpty())
+
+    val papers = com.example.data.model.PredefinedPapers.list
+    assertTrue("Debe haber papeles predefinidos", papers.isNotEmpty())
+
+    // 60 sheets of 90g hardcover book
+    val spineThicknessHardcover = com.example.data.model.SpineThicknessCalculator.calculateThicknessMm(
+      sheetCount = 60,
+      paperGrammageGsm = 90,
+      isHardcover = true
+    )
+    assertTrue("Lomo tapa dura debe tener grosor adecuado", spineThicknessHardcover > 10.0 && spineThicknessHardcover < 25.0)
+
+    // 60 sheets of softcover / open spine book
+    val spineThicknessSoftcover = com.example.data.model.SpineThicknessCalculator.calculateThicknessMm(
+      sheetCount = 60,
+      paperGrammageGsm = 90,
+      isHardcover = false
+    )
+    assertTrue("Lomo sin tapas duras debe ser más delgado", spineThicknessSoftcover < spineThicknessHardcover)
+  }
+
+  @Test
+  fun testLatinAmericanBindingDiversity() {
+    val bindings = PredefinedBindingTypes.list
+    
+    // External sewing
+    assertTrue("Debe incluir costura externa", bindings.any { it.spineType == SpineType.FRENCH_EXTERNAL || it.spineType == SpineType.EXPOSED_COPTIC })
+    // No spine / open spine
+    assertTrue("Debe incluir sin lomo / lomo expuesto", bindings.any { it.spineType == SpineType.OPEN_SPINE })
+    // French internal and external
+    assertTrue("Debe incluir costura francesa interna", bindings.any { it.spineType == SpineType.FRENCH_INTERNAL })
+    assertTrue("Debe incluir costura francesa externa", bindings.any { it.spineType == SpineType.FRENCH_EXTERNAL })
+    // Japanese internal and external
+    assertTrue("Debe incluir costura japonesa interna", bindings.any { it.spineType == SpineType.JAPANESE_INTERNAL })
+    assertTrue("Debe incluir costura japonesa externa", bindings.any { it.spineType == SpineType.JAPANESE_EXTERNAL })
+  }
+
+  @Test
+  fun testProposalExportSpecIntegrity() {
+    val binding = PredefinedBindingTypes.list.first { it.spineType == SpineType.EXPOSED_COPTIC }
+    val quote = com.example.data.model.QuoteCalculator.calculate(
+      bindingType = binding,
+      pageCount = 120,
+      formatSize = "A5 (14.8 x 21.0 cm)",
+      paperType = "Ahuesado 90g Book Cream",
+      coverMaterial = "Cuero Vacuno Envejecido",
+      hasRibbon = true,
+      hasMetalCorners = true,
+      hasElasticBand = false,
+      hasMarbledEndpapers = true,
+      hasSlipcase = true,
+      hasFoil = true,
+      quantity = 1,
+      customDiscountPercent = 0.0
+    )
+
+    val spec = com.example.util.ProposalExportSpec(
+      bindingType = binding,
+      widthCm = 14.8f,
+      lengthCm = 21.0f,
+      spineThicknessMm = 16.2f,
+      sheetCount = 60,
+      pageCount = 120,
+      paperType = "Ahuesado 90g Book Cream",
+      coverMaterial = "Cuero Vacuno Envejecido",
+      coverColorHex = 0xFF5C2C16,
+      foilTitle = "DIARIO DE VIAJES",
+      foilSubtitle = "EDICIÓN DE COLECCIÓN",
+      foilColorType = "Oro",
+      hasRibbon = true,
+      hasCorners = true,
+      hasSlipcase = true,
+      hasEndpapers = true,
+      clientName = "María Fernanda",
+      clientNotes = "Con estuche a medida y papel ahuesado",
+      quoteResult = quote,
+      estimatedDays = 5
+    )
+
+    assertEquals("Costura Copta Expuesta", spec.bindingType.name)
+    assertEquals(14.8f, spec.widthCm, 0.01f)
+    assertEquals(21.0f, spec.lengthCm, 0.01f)
+    assertEquals(16.2f, spec.spineThicknessMm, 0.01f)
+    assertTrue("Debe tener foil dorado", spec.foilColorType == "Oro")
+    assertTrue("Total cotizado debe ser mayor a 0", spec.quoteResult.total > 0)
+    assertEquals("María Fernanda", spec.clientName)
   }
 }
 

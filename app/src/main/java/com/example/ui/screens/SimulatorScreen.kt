@@ -36,7 +36,10 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -49,6 +52,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -70,7 +74,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.data.model.QuoteCalculator
+import com.example.data.model.PredefinedBookFormats
+import com.example.data.model.PredefinedPapers
 import com.example.ui.components.Book3DViewer
+import com.example.ui.components.BookProposalShareDialog
 import com.example.ui.theme.FoilGold
 import com.example.ui.theme.FoilSilver
 import com.example.ui.theme.GoldenOchre
@@ -78,6 +86,7 @@ import com.example.ui.theme.LeatherDark
 import com.example.ui.theme.SaddleBrown
 import com.example.ui.theme.Terracotta
 import com.example.ui.viewmodel.BookbindingViewModel
+import com.example.util.ProposalExportSpec
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -94,6 +103,50 @@ fun SimulatorScreen(
     val foilColor by viewModel.simulatorFoilColor.collectAsState()
     val hasRibbon by viewModel.simulatorHasRibbon.collectAsState()
     val hasCorners by viewModel.simulatorHasCorners.collectAsState()
+
+    // Unified Physical Dimensions & Paper States
+    val bookWidthCm by viewModel.bookWidthCm.collectAsState()
+    val bookLengthCm by viewModel.bookLengthCm.collectAsState()
+    val bookSheetCount by viewModel.bookSheetCount.collectAsState()
+    val bookPageCount by viewModel.bookPageCount.collectAsState()
+    val bookGrammageGsm by viewModel.bookGrammageGsm.collectAsState()
+    val bookPaperType by viewModel.bookPaperType.collectAsState()
+    val bookFormatSize by viewModel.bookFormatSize.collectAsState()
+    val spineThicknessMm by viewModel.calculatedSpineThicknessMm.collectAsState()
+    val estimatedSignatures by viewModel.estimatedSignatures.collectAsState()
+    val coverMaterial by viewModel.quoteCoverMaterial.collectAsState()
+    val quoteResult = viewModel.getCalculatedQuote()
+
+    var showShareDialog by remember { mutableStateOf(false) }
+
+    val exportSpec = remember(
+        simulatorBinding, bookWidthCm, bookLengthCm, spineThicknessMm,
+        bookSheetCount, bookPageCount, bookPaperType, coverMaterial,
+        coverColorHex, foilTitle, foilSubtitle, foilColor,
+        hasRibbon, hasCorners, quoteResult
+    ) {
+        ProposalExportSpec(
+            bindingType = simulatorBinding,
+            widthCm = bookWidthCm,
+            lengthCm = bookLengthCm,
+            spineThicknessMm = spineThicknessMm,
+            sheetCount = bookSheetCount,
+            pageCount = bookPageCount,
+            paperType = bookPaperType,
+            coverMaterial = coverMaterial,
+            coverColorHex = coverColorHex,
+            foilTitle = foilTitle,
+            foilSubtitle = foilSubtitle,
+            foilColorType = foilColor,
+            hasRibbon = hasRibbon,
+            hasCorners = hasCorners,
+            hasSlipcase = false,
+            hasEndpapers = true,
+            clientName = "",
+            clientNotes = "",
+            quoteResult = quoteResult
+        )
+    }
 
     // Camera Capture Launcher
     val takePhotoLauncher = rememberLauncherForActivityResult(
@@ -207,8 +260,48 @@ fun SimulatorScreen(
                             foilColorType = foilColor,
                             hasRibbon = hasRibbon,
                             hasCornerGuards = hasCorners,
-                            showControls = true
+                            showControls = true,
+                            widthCm = bookWidthCm,
+                            lengthCm = bookLengthCm,
+                            spineThicknessMm = spineThicknessMm,
+                            sheetCount = bookSheetCount,
+                            grammageGsm = bookGrammageGsm
                         )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Quick Share & Quote Bar below 3D Viewer
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showShareDialog = true },
+                                modifier = Modifier
+                                    .weight(1.2f)
+                                    .height(44.dp)
+                                    .testTag("btn_share_3d_proposal_top"),
+                                colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Compartir Ficha 3D", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.prepareQuotationFromSimulator() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .testTag("btn_quote_from_viewer_top"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Cotizar", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+                        }
                     }
                 }
             }
@@ -225,13 +318,27 @@ fun SimulatorScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "1. Estructura de Encuadernación",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "1. Estructura de Encuadernación",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${simulatorBinding.category} • ${simulatorBinding.subtitle}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(vertical = 4.dp)
@@ -240,7 +347,7 @@ fun SimulatorScreen(
                             val isSelected = binding.id == simulatorBinding.id
                             FilterChip(
                                 selected = isSelected,
-                                onClick = { viewModel.setSimulatorBinding(binding) },
+                                onClick = { viewModel.selectGlobalBinding(binding) },
                                 label = {
                                     Text(
                                         text = binding.name,
@@ -265,6 +372,201 @@ fun SimulatorScreen(
                                     labelColor = MaterialTheme.colorScheme.onSurface
                                 )
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. PHYSICAL DIMENSIONS, SHEETS & GRAMMAGE (CALCULADORA DE LOMO & CORTE)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "2. Dimensiones, Hojas & Gramaje",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "El modelo 3D y la cotización se recalculan en tiempo real",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Format Presets
+                    Text("Formato / Tamaño Estándar:", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 2.dp)
+                    ) {
+                        items(QuoteCalculator.standardFormats) { fmt ->
+                            val isFmtSelected = bookFormatSize == fmt.name
+                            FilterChip(
+                                selected = isFmtSelected,
+                                onClick = { viewModel.setBookFormatOption(fmt) },
+                                label = { Text("${fmt.name} (${fmt.widthCm}x${fmt.lengthCm}cm)", fontSize = 12.sp) },
+                                leadingIcon = if (isFmtSelected) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                } else null
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Ancho & Largo Sliders / Values
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Ancho
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Ancho (cm):", style = MaterialTheme.typography.bodySmall)
+                                Text("${String.format(java.util.Locale.US, "%.1f", bookWidthCm)} cm", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = bookWidthCm,
+                                onValueChange = { viewModel.setBookWidthCm(it) },
+                                valueRange = 8f..32f,
+                                steps = 24
+                            )
+                        }
+
+                        // Largo
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Largo (cm):", style = MaterialTheme.typography.bodySmall)
+                                Text("${String.format(java.util.Locale.US, "%.1f", bookLengthCm)} cm", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = bookLengthCm,
+                                onValueChange = { viewModel.setBookLengthCm(it) },
+                                valueRange = 10f..40f,
+                                steps = 30
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Paper Type & Grammage Chips
+                    Text("Tipo de Papel & Gramaje:", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 2.dp)
+                    ) {
+                        items(QuoteCalculator.standardPapers) { paper ->
+                            val isPaperSelected = bookPaperType == paper.name
+                            FilterChip(
+                                selected = isPaperSelected,
+                                onClick = { viewModel.setBookPaperOption(paper) },
+                                label = { Text("${paper.name} (${paper.grammageGsm} g/m²)", fontSize = 12.sp) },
+                                leadingIcon = if (isPaperSelected) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                } else null
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Sheet Count Slider
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Cantidad de Hojas:", style = MaterialTheme.typography.bodyMedium)
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "$bookSheetCount hojas ($bookPageCount páginas)",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    Slider(
+                        value = bookSheetCount.toFloat(),
+                        onValueChange = { viewModel.setBookSheetCount(it.toInt()) },
+                        valueRange = 10f..350f,
+                        steps = 34
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Calculation Summary Banner
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "📐 Grosor de Lomo:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = "${String.format(java.util.Locale.US, "%.1f", spineThicknessMm)} mm",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "📚 Cuadernillos sugeridos:",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = "$estimatedSignatures cuadernillos (de 4 hojas c/u)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
                         }
                     }
                 }
@@ -684,25 +986,51 @@ fun SimulatorScreen(
             }
         }
 
-        // BOTTOM ACTION: PASS TO QUOTATION
+        // BOTTOM ACTIONS: SHARE 3D PROPOSAL OR PASS TO QUOTATION
         item {
-            Button(
-                onClick = { viewModel.prepareQuotationFromSimulator() },
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
-                    .padding(horizontal = 16.dp)
-                    .testTag("btn_proceed_to_quote_from_simulator"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(Icons.Default.Calculate, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Crear Cotización con este Diseño", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Button(
+                    onClick = { showShareDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("btn_share_3d_proposal_bottom"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SaddleBrown,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Compartir Ficha 3D para Aprobación", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+
+                OutlinedButton(
+                    onClick = { viewModel.prepareQuotationFromSimulator() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("btn_proceed_to_quote_from_simulator"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.Calculate, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Crear Cotización con este Diseño", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
             }
         }
+    }
+
+    if (showShareDialog) {
+        BookProposalShareDialog(
+            spec = exportSpec,
+            onDismiss = { showShareDialog = false }
+        )
     }
 }

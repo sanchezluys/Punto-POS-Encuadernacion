@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -69,6 +71,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.QuoteCalculator
+import com.example.data.model.PredefinedBookFormats
+import com.example.data.model.PredefinedPapers
+import com.example.ui.components.BookProposalShareDialog
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.GoldenOchre
 import com.example.ui.theme.LeatherDark
@@ -76,6 +82,7 @@ import com.example.ui.theme.SaddleBrown
 import com.example.ui.theme.Terracotta
 import com.example.ui.viewmodel.AppNavScreen
 import com.example.ui.viewmodel.BookbindingViewModel
+import com.example.util.ProposalExportSpec
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -88,9 +95,16 @@ fun QuotationScreen(
     val scope = rememberCoroutineScope()
 
     val quoteBinding by viewModel.quoteBinding.collectAsState()
-    val formatSize by viewModel.quoteFormatSize.collectAsState()
-    val pageCount by viewModel.quotePageCount.collectAsState()
-    val paperType by viewModel.quotePaperType.collectAsState()
+    val formatSize by viewModel.bookFormatSize.collectAsState()
+    val pageCount by viewModel.bookPageCount.collectAsState()
+    val sheetCount by viewModel.bookSheetCount.collectAsState()
+    val paperType by viewModel.bookPaperType.collectAsState()
+    val grammageGsm by viewModel.bookGrammageGsm.collectAsState()
+    val bookWidthCm by viewModel.bookWidthCm.collectAsState()
+    val bookLengthCm by viewModel.bookLengthCm.collectAsState()
+    val spineThicknessMm by viewModel.calculatedSpineThicknessMm.collectAsState()
+    val estimatedSignatures by viewModel.estimatedSignatures.collectAsState()
+
     val coverMaterial by viewModel.quoteCoverMaterial.collectAsState()
     val hasRibbon by viewModel.quoteHasRibbon.collectAsState()
     val hasCorners by viewModel.quoteHasCorners.collectAsState()
@@ -107,7 +121,44 @@ fun QuotationScreen(
     val customerNotes by viewModel.quoteCustomerNotes.collectAsState()
     val depositPaid by viewModel.quoteDepositPaid.collectAsState()
 
+    val coverColorHex by viewModel.simulatorColorHex.collectAsState()
+    val foilTitle by viewModel.simulatorFoilTitle.collectAsState()
+    val foilSubtitle by viewModel.simulatorFoilSubtitle.collectAsState()
+    val foilColor by viewModel.simulatorFoilColor.collectAsState()
+
     val quoteResult = viewModel.getCalculatedQuote()
+
+    var showShareDialog by remember { mutableStateOf(false) }
+
+    val exportSpec = remember(
+        quoteBinding, bookWidthCm, bookLengthCm, spineThicknessMm,
+        sheetCount, pageCount, paperType, coverMaterial,
+        coverColorHex, foilTitle, foilSubtitle, foilColor,
+        hasRibbon, hasCorners, hasSlipcase, hasMarbled,
+        quoteResult, customerName, customerNotes
+    ) {
+        ProposalExportSpec(
+            bindingType = quoteBinding,
+            widthCm = bookWidthCm,
+            lengthCm = bookLengthCm,
+            spineThicknessMm = spineThicknessMm,
+            sheetCount = sheetCount,
+            pageCount = pageCount,
+            paperType = paperType,
+            coverMaterial = coverMaterial,
+            coverColorHex = coverColorHex,
+            foilTitle = foilTitle,
+            foilSubtitle = foilSubtitle,
+            foilColorType = if (hasFoil) foilColor else "Sin Foil",
+            hasRibbon = hasRibbon,
+            hasCorners = hasCorners,
+            hasSlipcase = hasSlipcase,
+            hasEndpapers = hasMarbled,
+            clientName = customerName,
+            clientNotes = customerNotes,
+            quoteResult = quoteResult
+        )
+    }
 
     LazyColumn(
         modifier = modifier
@@ -126,7 +177,7 @@ fun QuotationScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Cálculo automático de costos de materiales, mano de obra y descuentos.",
+                    text = "Cálculo automático de costos de materiales, mano de obra y lomo sincronizado.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = 4.dp)
@@ -142,11 +193,30 @@ fun QuotationScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "1. Estilo de Encuadernación",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "1. Estilo de Encuadernación",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${quoteBinding.category} • ${quoteBinding.subtitle}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.navigateTo(AppNavScreen.SIMULADOR) }
+                        ) {
+                            Icon(Icons.Default.Visibility, contentDescription = "Ver en 3D", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -156,7 +226,7 @@ fun QuotationScreen(
                             val isSelected = binding.id == quoteBinding.id
                             FilterChip(
                                 selected = isSelected,
-                                onClick = { viewModel.setQuoteBinding(binding) },
+                                onClick = { viewModel.selectGlobalBinding(binding) },
                                 label = { Text(binding.name) },
                                 leadingIcon = if (isSelected) {
                                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
@@ -172,7 +242,7 @@ fun QuotationScreen(
             }
         }
 
-        // 2. FORMAT & PAGE COUNT
+        // 2. FORMAT, DIMENSIONS, SHEETS & GRAMMAGE (CALCULADORA DE LOMO)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -181,48 +251,86 @@ fun QuotationScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "2. Dimensiones y Hojas",
+                        text = "2. Dimensiones, Hojas & Gramaje",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    Text("Formato del Libro:", style = MaterialTheme.typography.labelMedium)
+                    Text("Formato Estándar:", style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(6.dp))
-                    val formats = listOf(
-                        "A5 (14.8 x 21 cm)",
-                        "A4 (21 x 29.7 cm)",
-                        "A6 (10.5 x 14.8 cm)",
-                        "Cuadrado 20x20 cm"
-                    )
-                    FlowRow(
+                    LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        contentPadding = PaddingValues(vertical = 2.dp)
                     ) {
-                        formats.forEach { fmt ->
-                            val isFmtSelected = formatSize == fmt
+                        items(com.example.data.model.QuoteCalculator.standardFormats) { fmt ->
+                            val isFmtSelected = formatSize == fmt.name
                             FilterChip(
                                 selected = isFmtSelected,
-                                onClick = { viewModel.setQuoteFormatSize(fmt) },
-                                label = { Text(fmt, fontSize = 12.sp) }
+                                onClick = { viewModel.setBookFormatOption(fmt) },
+                                label = { Text("${fmt.name} (${fmt.widthCm}x${fmt.lengthCm}cm)", fontSize = 12.sp) },
+                                leadingIcon = if (isFmtSelected) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                } else null
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
+                    // Ancho & Largo (cm) Sliders
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Ancho:", style = MaterialTheme.typography.bodySmall)
+                                Text("${String.format(java.util.Locale.US, "%.1f", bookWidthCm)} cm", fontWeight = FontWeight.Bold, color = SaddleBrown)
+                            }
+                            Slider(
+                                value = bookWidthCm,
+                                onValueChange = { viewModel.setBookWidthCm(it) },
+                                valueRange = 8f..32f,
+                                steps = 24
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Largo:", style = MaterialTheme.typography.bodySmall)
+                                Text("${String.format(java.util.Locale.US, "%.1f", bookLengthCm)} cm", fontWeight = FontWeight.Bold, color = SaddleBrown)
+                            }
+                            Slider(
+                                value = bookLengthCm,
+                                onValueChange = { viewModel.setBookLengthCm(it) },
+                                valueRange = 10f..40f,
+                                steps = 30
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Hojas & Páginas Slider
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Cantidad de Páginas:", style = MaterialTheme.typography.bodyMedium)
+                        Text("Cantidad de Hojas / Páginas:", style = MaterialTheme.typography.bodyMedium)
                         Surface(
-                            color = SaddleBrown.copy(alpha = 0.1f),
+                            color = SaddleBrown.copy(alpha = 0.12f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                text = "$pageCount págs (${pageCount / 2} hojas)",
+                                text = "$sheetCount hojas ($pageCount págs)",
                                 fontWeight = FontWeight.Bold,
                                 color = SaddleBrown,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -231,16 +339,59 @@ fun QuotationScreen(
                     }
 
                     Slider(
-                        value = pageCount.toFloat(),
-                        onValueChange = { viewModel.setQuotePageCount(it.toInt()) },
-                        valueRange = 20f..500f,
-                        steps = 23,
+                        value = sheetCount.toFloat(),
+                        onValueChange = { viewModel.setBookSheetCount(it.toInt()) },
+                        valueRange = 10f..350f,
+                        steps = 34,
                         colors = SliderDefaults.colors(
                             thumbColor = SaddleBrown,
                             activeTrackColor = SaddleBrown
                         ),
                         modifier = Modifier.testTag("slider_page_count")
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Realtime Spine Banner
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "📐 Grosor de Lomo Estimado:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "${String.format(java.util.Locale.US, "%.1f", spineThicknessMm)} mm",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SaddleBrown
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "📚 Cuadernillos sugeridos:",
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "$estimatedSignatures cuadernillos (de 4 hojas c/u)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -260,23 +411,21 @@ fun QuotationScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    Text("Tipo de Papel Interior:", style = MaterialTheme.typography.labelMedium)
+                    Text("Tipo de Papel Interior & Gramaje:", style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(6.dp))
-                    val papers = listOf(
-                        "Ahuesado 90g Book Cream",
-                        "Kraft Verjurado 120g",
-                        "Papel Acuarela 300g",
-                        "Bond Ahuesado 80g"
-                    )
-                    FlowRow(
+                    LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        contentPadding = PaddingValues(vertical = 2.dp)
                     ) {
-                        papers.forEach { p ->
+                        items(com.example.data.model.QuoteCalculator.standardPapers) { p ->
+                            val isPapSelected = paperType == p.name
                             FilterChip(
-                                selected = paperType == p,
-                                onClick = { viewModel.setQuotePaperType(p) },
-                                label = { Text(p, fontSize = 12.sp) }
+                                selected = isPapSelected,
+                                onClick = { viewModel.setBookPaperOption(p) },
+                                label = { Text("${p.name} (${p.grammageGsm} g/m²)", fontSize = 12.sp) },
+                                leadingIcon = if (isPapSelected) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                } else null
                             )
                         }
                     }
@@ -290,7 +439,9 @@ fun QuotationScreen(
                         "Cuero Vacuno Envejecido",
                         "Papel Marmoleado Florentino",
                         "Cartulina Kraft 300g",
-                        "Seda Japonesa Washi"
+                        "Seda Japonesa Washi",
+                        "Papel Amate Tradicional",
+                        "Papel Hecho a Mano (Algodón)"
                     )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -600,9 +751,27 @@ fun QuotationScreen(
             }
         }
 
-        // 8. ACTIONS: SAVE QUOTE OR CONFIRM ORDER
+        // 8. ACTIONS: SHARE PROPOSAL, SAVE QUOTE OR CONFIRM ORDER
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Share High Impact Proposal Card with 3D Mockup
+                Button(
+                    onClick = { showShareDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("btn_share_quote_proposal"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = GoldenOchre,
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Compartir Ficha Comercial 3D con el Cliente", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+
                 // Confirm Order and send to Workshop
                 Button(
                     onClick = {
@@ -647,6 +816,13 @@ fun QuotationScreen(
                 }
             }
         }
+    }
+
+    if (showShareDialog) {
+        BookProposalShareDialog(
+            spec = exportSpec,
+            onDismiss = { showShareDialog = false }
+        )
     }
 }
 

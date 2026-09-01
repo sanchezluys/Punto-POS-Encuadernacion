@@ -134,7 +134,12 @@ fun Book3DViewer(
     ribbonColor: Color = Color(0xFFC41E3A), // Wine/Ruby ribbon
     showControls: Boolean = true,
     initialYaw: Float = -25f,
-    initialPitch: Float = 15f
+    initialPitch: Float = 15f,
+    widthCm: Float = 14.8f,
+    lengthCm: Float = 21.0f,
+    spineThicknessMm: Float = 16.0f,
+    sheetCount: Int = 60,
+    grammageGsm: Int = 90
 ) {
     var yawDeg by remember { mutableFloatStateOf(initialYaw) }
     var pitchDeg by remember { mutableFloatStateOf(initialPitch) }
@@ -207,7 +212,10 @@ fun Book3DViewer(
                 foilColorType = foilColorType,
                 hasRibbon = hasRibbon,
                 hasCornerGuards = hasCornerGuards,
-                ribbonColor = ribbonColor
+                ribbonColor = ribbonColor,
+                widthCm = widthCm,
+                lengthCm = lengthCm,
+                spineThicknessMm = spineThicknessMm
             )
         }
 
@@ -225,7 +233,7 @@ fun Book3DViewer(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Interaction guidance pill with current Zoom display
+                    // Interaction guidance pill with current Dimensions and Zoom display
                     Surface(
                         color = Color.White.copy(alpha = 0.94f),
                         shape = RoundedCornerShape(20.dp),
@@ -244,7 +252,7 @@ fun Book3DViewer(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Giro 360° • Zoom ${(zoomScale * 100).toInt()}%",
+                                text = "${widthCm}x${lengthCm} cm • Lomo ${spineThicknessMm}mm • Zoom ${(zoomScale * 100).toInt()}%",
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -426,16 +434,21 @@ private fun DrawScope.draw3DBook(
     foilColorType: String,
     hasRibbon: Boolean,
     hasCornerGuards: Boolean,
-    ribbonColor: Color
+    ribbonColor: Color,
+    widthCm: Float = 14.8f,
+    lengthCm: Float = 21.0f,
+    spineThicknessMm: Float = 16.0f
 ) {
     val yawRad = (yawDeg * PI / 180f).toFloat()
     val pitchRad = (pitchDeg * PI / 180f).toFloat()
 
-    // Dimensions of standard book in 3D coordinate space
-    val bookWidth = 145f
-    val bookHeight = 210f
-    val bookThickness = 32f
-    val coverOverhang = 5f
+    // Proportional dimensions in 3D coordinate space normalized to viewport
+    val baseLength = 205f
+    val scaleFactor = baseLength / lengthCm.coerceIn(10f, 45f)
+    val bookHeight = baseLength
+    val bookWidth = (widthCm.coerceIn(8f, 35f) * scaleFactor).coerceIn(85f, 260f)
+    val bookThickness = (spineThicknessMm.coerceIn(4f, 75f) * scaleFactor * 0.95f).coerceIn(12f, 70f)
+    val coverOverhang = if (bindingType.spineType == SpineType.OPEN_SPINE || bindingType.spineType == SpineType.EXPOSED_COPTIC) 2f else 5f
 
     // Transform function
     fun tr(p: Point3D): Point3D {
@@ -752,29 +765,109 @@ private fun DrawScope.draw3DBook(
                 }
                 drawPath(p, color = coverColor.copy(alpha = 0.18f))
             } else {
-                // Spine color with realistic cylinder lighting
-                drawPath(
-                    p,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            coverColor.copy(alpha = 0.85f),
-                            coverColor,
-                            coverColor.copy(alpha = 0.6f)
-                        ),
-                        start = proj(spineTL),
-                        end = proj(spineTR)
-                    )
-                )
+                // Spine base color or exposed paper signatures
+                when (bindingType.spineType) {
+                    SpineType.OPEN_SPINE, SpineType.EXPOSED_COPTIC, SpineType.FRENCH_EXTERNAL -> {
+                        // Exposed book signatures (ivory / antique paper folds)
+                        drawPath(
+                            p,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xFFE8DFD1),
+                                    Color(0xFFF7F2E7),
+                                    Color(0xFFDDD2BE)
+                                ),
+                                start = proj(spineTL),
+                                end = proj(spineTR)
+                            )
+                        )
+                    }
+                    else -> {
+                        // Spine color with realistic cylinder lighting
+                        drawPath(
+                            p,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    coverColor.copy(alpha = 0.85f),
+                                    coverColor,
+                                    coverColor.copy(alpha = 0.6f)
+                                ),
+                                start = proj(spineTL),
+                                end = proj(spineTR)
+                            )
+                        )
+                    }
+                }
             }
 
             // Specialized Spine details based on Binding Style
-            when (bindingType.spineType) {
-                SpineType.EXPOSED_COPTIC -> {
-                    val spTop = proj(spineTL)
-                    val spBottom = proj(spineBL)
-                    val spRightTop = proj(spineTR)
-                    val spRightBottom = proj(spineBR)
+            val spTop = proj(spineTL)
+            val spBottom = proj(spineBL)
+            val spRightTop = proj(spineTR)
+            val spRightBottom = proj(spineBR)
 
+            when (bindingType.spineType) {
+                SpineType.OPEN_SPINE -> {
+                    // Signatures horizontal folds & sewing thread stations
+                    for (sig in 1..12) {
+                        val frac = sig / 13f
+                        val sx1 = spTop.x + (spBottom.x - spTop.x) * frac
+                        val sy1 = spTop.y + (spBottom.y - spTop.y) * frac
+                        val sx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
+                        val sy2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
+
+                        drawLine(
+                            color = Color(0xFF8D7B68).copy(alpha = 0.4f),
+                            start = Offset(sx1, sy1),
+                            end = Offset(sx2, sy2),
+                            strokeWidth = 1f * zoomScale
+                        )
+                    }
+                    // Vertical sewing stations stitches
+                    for (st in 1..5) {
+                        val frac = st / 6f
+                        val sx = spTop.x + (spRightTop.x - spTop.x) * frac
+                        val sy = spTop.y + (spRightTop.y - spTop.y) * frac
+                        val bx = spBottom.x + (spRightBottom.x - spBottom.x) * frac
+                        val by = spBottom.y + (spRightBottom.y - spBottom.y) * frac
+
+                        drawLine(
+                            color = Color(0xFFFAF3E0),
+                            start = Offset(sx, sy),
+                            end = Offset(bx, by),
+                            strokeWidth = 2f * zoomScale,
+                            cap = StrokeCap.Round
+                        )
+                        // Knots
+                        for (k in 1..4) {
+                            val kf = k / 5f
+                            val kx = sx + (bx - sx) * kf
+                            val ky = sy + (by - sy) * kf
+                            drawCircle(
+                                color = Color(0xFFD4A017),
+                                radius = 2.5f * zoomScale,
+                                center = Offset(kx, ky)
+                            )
+                        }
+                    }
+                }
+
+                SpineType.EXPOSED_COPTIC -> {
+                    // Exposed signature folds behind the chain stitches
+                    for (sig in 1..10) {
+                        val frac = sig / 11f
+                        val sx1 = spTop.x + (spBottom.x - spTop.x) * frac
+                        val sy1 = spTop.y + (spBottom.y - spTop.y) * frac
+                        val sx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
+                        val sy2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
+                        drawLine(
+                            color = Color(0xFF9C8B77).copy(alpha = 0.35f),
+                            start = Offset(sx1, sy1),
+                            end = Offset(sx2, sy2),
+                            strokeWidth = 1.2f * zoomScale
+                        )
+                    }
+                    // Coptic braided herringbone chain stitches
                     for (k in 1..7) {
                         val frac = k / 8f
                         val sx1 = spTop.x + (spBottom.x - spTop.x) * frac
@@ -798,29 +891,217 @@ private fun DrawScope.draw3DBook(
                         )
                     }
                 }
-                SpineType.JAPANESE_STAB -> {
-                    val spTop = proj(spineTL)
-                    val spBottom = proj(spineBL)
+
+                SpineType.FRENCH_EXTERNAL -> {
+                    // Exposed paper signatures folds
+                    for (sig in 1..10) {
+                        val frac = sig / 11f
+                        val sx1 = spTop.x + (spBottom.x - spTop.x) * frac
+                        val sy1 = spTop.y + (spBottom.y - spTop.y) * frac
+                        val sx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
+                        val sy2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
+                        drawLine(
+                            color = Color(0xFF8D7B68).copy(alpha = 0.35f),
+                            start = Offset(sx1, sy1),
+                            end = Offset(sx2, sy2),
+                            strokeWidth = 1f * zoomScale
+                        )
+                    }
+                    // 4 Wide horizontal leather/cotton support ribbons with French cross stitches
+                    for (tape in 1..4) {
+                        val frac = tape / 5f
+                        val tx1 = spTop.x + (spBottom.x - spTop.x) * frac
+                        val ty1 = spTop.y + (spBottom.y - spTop.y) * frac
+                        val tx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
+                        val ty2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
+
+                        // Ribbon band
+                        drawLine(
+                            color = Color(0xFF3E2723),
+                            start = Offset(tx1, ty1),
+                            end = Offset(tx2, ty2),
+                            strokeWidth = 9f * zoomScale,
+                            cap = StrokeCap.Square
+                        )
+                        // French chevron cross stitch over ribbon
+                        drawLine(
+                            color = Color(0xFFFFF8E7),
+                            start = Offset(tx1 - 2f * zoomScale, ty1 - 3f * zoomScale),
+                            end = Offset(tx2 + 2f * zoomScale, ty2 + 3f * zoomScale),
+                            strokeWidth = 2f * zoomScale
+                        )
+                        drawLine(
+                            color = Color(0xFFFFF8E7),
+                            start = Offset(tx1 - 2f * zoomScale, ty1 + 3f * zoomScale),
+                            end = Offset(tx2 + 2f * zoomScale, ty2 - 3f * zoomScale),
+                            strokeWidth = 2f * zoomScale
+                        )
+                    }
+                }
+
+                SpineType.EXPOSED_BELGIAN -> {
+                    // Interlaced criss-cross sewing pattern of Secret Belgian binding
+                    for (b in 1..6) {
+                        val frac1 = (b - 0.5f) / 6f
+                        val frac2 = (b + 0.5f) / 6f
+                        val x1 = spTop.x + (spBottom.x - spTop.x) * frac1
+                        val y1 = spTop.y + (spBottom.y - spTop.y) * frac1
+                        val x2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac2
+                        val y2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac2
+
+                        drawLine(
+                            color = Color(0xFFF5E6CC),
+                            start = Offset(x1, y1),
+                            end = Offset(x2, y2),
+                            strokeWidth = 2.8f * zoomScale,
+                            cap = StrokeCap.Round
+                        )
+                        drawLine(
+                            color = Color(0xFFD4A017),
+                            start = Offset(x2, y2),
+                            end = Offset(x1, y1),
+                            strokeWidth = 2f * zoomScale,
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
+
+                SpineType.FRENCH_INTERNAL -> {
+                    // Classical French 5 double raised bands with filigree gold lines
+                    for (rib in 1..5) {
+                        val frac = rib / 6f
+                        val rx1 = spTop.x + (spBottom.x - spTop.x) * frac
+                        val ry1 = spTop.y + (spBottom.y - spTop.y) * frac
+                        val rx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
+                        val ry2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
+
+                        // Double raised cord
+                        drawLine(
+                            color = Color.Black.copy(alpha = 0.6f),
+                            start = Offset(rx1, ry1 + 3f * zoomScale),
+                            end = Offset(rx2, ry2 + 3f * zoomScale),
+                            strokeWidth = 3f * zoomScale
+                        )
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.4f),
+                            start = Offset(rx1, ry1 - 2f * zoomScale),
+                            end = Offset(rx2, ry2 - 2f * zoomScale),
+                            strokeWidth = 2f * zoomScale
+                        )
+                        // Gold filigree line bordering the cord
+                        drawLine(
+                            color = FoilGold.copy(alpha = 0.75f),
+                            start = Offset(rx1, ry1),
+                            end = Offset(rx2, ry2),
+                            strokeWidth = 1.2f * zoomScale
+                        )
+                    }
+                    // French two-tone woven silk headbands (cabezadas) at head and tail
+                    drawLine(
+                        color = Color(0xFFB8860B),
+                        start = spTop,
+                        end = spRightTop,
+                        strokeWidth = 4f * zoomScale
+                    )
+                    drawLine(
+                        color = Color(0xFFB8860B),
+                        start = spBottom,
+                        end = spRightBottom,
+                        strokeWidth = 4f * zoomScale
+                    )
+                }
+
+                SpineType.HALF_LEATHER_DUTCH -> {
+                    // Leather spine with 4 raised bands and gold tooling lines
+                    for (rib in 1..4) {
+                        val frac = rib / 5f
+                        val rx1 = spTop.x + (spBottom.x - spTop.x) * frac
+                        val ry1 = spTop.y + (spBottom.y - spTop.y) * frac
+                        val rx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
+                        val ry2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
+
+                        drawLine(
+                            color = Color.Black.copy(alpha = 0.55f),
+                            start = Offset(rx1, ry1 + 2.5f * zoomScale),
+                            end = Offset(rx2, ry2 + 2.5f * zoomScale),
+                            strokeWidth = 3.5f * zoomScale
+                        )
+                        drawLine(
+                            color = FoilGold.copy(alpha = 0.85f),
+                            start = Offset(rx1, ry1 - 1f * zoomScale),
+                            end = Offset(rx2, ry2 - 1f * zoomScale),
+                            strokeWidth = 1.5f * zoomScale
+                        )
+                    }
+                }
+
+                SpineType.ROUNDED_NERVIOS -> {
+                    // 4 Thick prominent raised bands with deep leather shadows
+                    for (rib in 1..4) {
+                        val frac = rib / 5f
+                        val rx1 = spTop.x + (spBottom.x - spTop.x) * frac
+                        val ry1 = spTop.y + (spBottom.y - spTop.y) * frac
+                        val rx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
+                        val ry2 = spRightTop.y + (spRightBottom.y - spRightTop.y) * frac
+
+                        drawLine(
+                            color = Color.Black.copy(alpha = 0.7f),
+                            start = Offset(rx1, ry1 + 3.5f * zoomScale),
+                            end = Offset(rx2, ry2 + 3.5f * zoomScale),
+                            strokeWidth = 4.5f * zoomScale
+                        )
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.45f),
+                            start = Offset(rx1, ry1 - 2f * zoomScale),
+                            end = Offset(rx2, ry2 - 2f * zoomScale),
+                            strokeWidth = 2.5f * zoomScale
+                        )
+                    }
+                }
+
+                SpineType.JAPANESE_EXTERNAL -> {
+                    // Japanese corner edge wraps at spine top and bottom
+                    drawLine(
+                        color = Color(0xFFF3E5AB),
+                        start = spTop,
+                        end = Offset(spTop.x + 12f * zoomScale, spTop.y),
+                        strokeWidth = 3f * zoomScale
+                    )
+                    drawLine(
+                        color = Color(0xFFF3E5AB),
+                        start = spBottom,
+                        end = Offset(spBottom.x + 12f * zoomScale, spBottom.y),
+                        strokeWidth = 3f * zoomScale
+                    )
                     for (h in 1..4) {
                         val frac = h / 5f
                         val hx = spTop.x + (spBottom.x - spTop.x) * frac
                         val hy = spTop.y + (spBottom.y - spTop.y) * frac
                         drawCircle(
                             color = Color(0xFF1E1510),
-                            radius = 4f * zoomScale,
-                            center = Offset(hx + 12f * zoomScale, hy)
+                            radius = 3.5f * zoomScale,
+                            center = Offset(hx + 10f * zoomScale, hy)
                         )
                         drawLine(
                             color = Color(0xFFF3E5AB),
                             start = Offset(hx, hy),
-                            end = Offset(hx + 12f * zoomScale, hy),
+                            end = Offset(hx + 10f * zoomScale, hy),
                             strokeWidth = 2.5f * zoomScale
                         )
                     }
                 }
+
+                SpineType.JAPANESE_INTERNAL -> {
+                    // Clean flexible spine with fine edge line
+                    drawLine(
+                        color = Color.Black.copy(alpha = 0.2f),
+                        start = spTop,
+                        end = spBottom,
+                        strokeWidth = 1.5f * zoomScale
+                    )
+                }
+
                 SpineType.SPIRAL_WIRE -> {
-                    val spTop = proj(spineTL)
-                    val spBottom = proj(spineBL)
                     for (w in 1..14) {
                         val frac = w / 15f
                         val wx = spTop.x + (spBottom.x - spTop.x) * frac
@@ -833,12 +1114,8 @@ private fun DrawScope.draw3DBook(
                         )
                     }
                 }
-                SpineType.ROUNDED, SpineType.FLAT -> {
-                    val spTop = proj(spineTL)
-                    val spBottom = proj(spineBL)
-                    val spRightTop = proj(spineTR)
-                    val spRightBottom = proj(spineBR)
 
+                SpineType.ROUNDED, SpineType.FLAT -> {
                     for (rib in 1..4) {
                         val frac = rib / 5f
                         val rx1 = spTop.x + (spBottom.x - spTop.x) * frac
@@ -977,6 +1254,166 @@ private fun DrawScope.draw3DBook(
                 },
                 style = Stroke(width = 2f * zoomScale, join = StrokeJoin.Round)
             )
+
+            // Front cover artisanal details per binding technique
+            when (bindingType.spineType) {
+                SpineType.HALF_LEATHER_DUTCH -> {
+                    // Dutch half-leather: leather spine strip on left side (25% width) + gold separating filet
+                    val splitTL = Offset(ptTL.x + (ptTR.x - ptTL.x) * 0.26f, ptTL.y + (ptTR.y - ptTL.y) * 0.26f)
+                    val splitBL = Offset(ptBL.x + (ptBR.x - ptBL.x) * 0.26f, ptBL.y + (ptBR.y - ptBL.y) * 0.26f)
+
+                    val leatherStrip = Path().apply {
+                        moveTo(ptTL.x, ptTL.y)
+                        lineTo(splitTL.x, splitTL.y)
+                        lineTo(splitBL.x, splitBL.y)
+                        lineTo(ptBL.x, ptBL.y)
+                        close()
+                    }
+                    drawPath(leatherStrip, color = Color(0xFF2C1810).copy(alpha = 0.82f))
+                    // Gold filet separating strip
+                    drawLine(
+                        color = FoilGold.copy(alpha = 0.9f),
+                        start = splitTL,
+                        end = splitBL,
+                        strokeWidth = 2f * zoomScale
+                    )
+                    // Leather corner triangles
+                    val corTR1 = Offset(ptTR.x - (ptTR.x - ptTL.x) * 0.22f, ptTR.y - (ptTR.y - ptTL.y) * 0.22f)
+                    val corTR2 = Offset(ptTR.x + (ptBR.x - ptTR.x) * 0.22f, ptTR.y + (ptBR.y - ptTR.y) * 0.22f)
+                    val cTriangleTR = Path().apply {
+                        moveTo(ptTR.x, ptTR.y)
+                        lineTo(corTR1.x, corTR1.y)
+                        lineTo(corTR2.x, corTR2.y)
+                        close()
+                    }
+                    drawPath(cTriangleTR, color = Color(0xFF2C1810).copy(alpha = 0.82f))
+                    drawLine(color = FoilGold.copy(alpha = 0.9f), start = corTR1, end = corTR2, strokeWidth = 1.8f * zoomScale)
+
+                    val corBR1 = Offset(ptBR.x - (ptBR.x - ptBL.x) * 0.22f, ptBR.y - (ptBR.y - ptBL.y) * 0.22f)
+                    val corBR2 = Offset(ptBR.x - (ptBR.x - ptTR.x) * 0.22f, ptBR.y - (ptBR.y - ptTR.y) * 0.22f)
+                    val cTriangleBR = Path().apply {
+                        moveTo(ptBR.x, ptBR.y)
+                        lineTo(corBR1.x, corBR1.y)
+                        lineTo(corBR2.x, corBR2.y)
+                        close()
+                    }
+                    drawPath(cTriangleBR, color = Color(0xFF2C1810).copy(alpha = 0.82f))
+                    drawLine(color = FoilGold.copy(alpha = 0.9f), start = corBR1, end = corBR2, strokeWidth = 1.8f * zoomScale)
+                }
+
+                SpineType.JAPANESE_EXTERNAL -> {
+                    // Japanese 4-hole / Asanoha stabbing along inner edge
+                    val marginFrac = 0.16f
+                    val hTL = Offset(ptTL.x + (ptTR.x - ptTL.x) * marginFrac, ptTL.y + (ptTR.y - ptTL.y) * marginFrac)
+                    val hBL = Offset(ptBL.x + (ptBR.x - ptBL.x) * marginFrac, ptBL.y + (ptBR.y - ptBL.y) * marginFrac)
+
+                    // Vertical stitch connecting all 4 holes
+                    drawLine(
+                        color = Color(0xFFFAF0DD),
+                        start = hTL,
+                        end = hBL,
+                        strokeWidth = 3f * zoomScale,
+                        cap = StrokeCap.Round
+                    )
+
+                    // Holes & edge wraps
+                    for (h in 1..4) {
+                        val frac = h / 5f
+                        val hx = hTL.x + (hBL.x - hTL.x) * frac
+                        val hy = hTL.y + (hBL.y - hTL.y) * frac
+
+                        val edgeX = ptTL.x + (ptBL.x - ptTL.x) * frac
+                        val edgeY = ptTL.y + (ptBL.y - ptTL.y) * frac
+
+                        // Horizontal stitch wrapping spine edge
+                        drawLine(
+                            color = Color(0xFFFAF0DD),
+                            start = Offset(hx, hy),
+                            end = Offset(edgeX, edgeY),
+                            strokeWidth = 3f * zoomScale,
+                            cap = StrokeCap.Round
+                        )
+                        // Punched eyelet
+                        drawCircle(
+                            color = Color(0xFF1E1510),
+                            radius = 3.8f * zoomScale,
+                            center = Offset(hx, hy)
+                        )
+                    }
+
+                    // Top & bottom corner wrap stitches
+                    val topEdgeH1 = Offset(hTL.x + (hBL.x - hTL.x) * 0.2f, hTL.y + (hBL.y - hTL.y) * 0.2f)
+                    drawLine(
+                        color = Color(0xFFFAF0DD),
+                        start = topEdgeH1,
+                        end = ptTL,
+                        strokeWidth = 3f * zoomScale,
+                        cap = StrokeCap.Round
+                    )
+                    val botEdgeH4 = Offset(hTL.x + (hBL.x - hTL.x) * 0.8f, hTL.y + (hBL.y - hTL.y) * 0.8f)
+                    drawLine(
+                        color = Color(0xFFFAF0DD),
+                        start = botEdgeH4,
+                        end = ptBL,
+                        strokeWidth = 3f * zoomScale,
+                        cap = StrokeCap.Round
+                    )
+
+                    // Silk corner protectors (Kado)
+                    val kadoTop = Path().apply {
+                        moveTo(ptTL.x, ptTL.y)
+                        lineTo(ptTL.x + (ptTR.x - ptTL.x) * 0.12f, ptTL.y + (ptTR.y - ptTL.y) * 0.12f)
+                        lineTo(ptTL.x + (ptBL.x - ptTL.x) * 0.12f, ptTL.y + (ptBL.y - ptTL.y) * 0.12f)
+                        close()
+                    }
+                    drawPath(kadoTop, color = Color(0xFF4A1525).copy(alpha = 0.88f))
+
+                    val kadoBot = Path().apply {
+                        moveTo(ptBL.x, ptBL.y)
+                        lineTo(ptBL.x + (ptBR.x - ptBL.x) * 0.12f, ptBL.y + (ptBR.y - ptBL.y) * 0.12f)
+                        lineTo(ptBL.x - (ptBL.x - ptTL.x) * 0.12f, ptBL.y - (ptBL.y - ptTL.y) * 0.12f)
+                        close()
+                    }
+                    drawPath(kadoBot, color = Color(0xFF4A1525).copy(alpha = 0.88f))
+                }
+
+                SpineType.JAPANESE_INTERNAL -> {
+                    // Minimalist silk corner wraps (Kado) and fine blind embossed fold line
+                    val foldTL = Offset(ptTL.x + (ptTR.x - ptTL.x) * 0.14f, ptTL.y + (ptTR.y - ptTL.y) * 0.14f)
+                    val foldBL = Offset(ptBL.x + (ptBR.x - ptBL.x) * 0.14f, ptBL.y + (ptBR.y - ptBL.y) * 0.14f)
+                    drawLine(
+                        color = Color.Black.copy(alpha = 0.25f),
+                        start = foldTL,
+                        end = foldBL,
+                        strokeWidth = 1.5f * zoomScale
+                    )
+                }
+
+                SpineType.FRENCH_EXTERNAL -> {
+                    // Horizontal ribbon extensions crossing onto front cover with stitched rivets
+                    for (tape in 1..4) {
+                        val frac = tape / 5f
+                        val tx = ptTL.x + (ptBL.x - ptTL.x) * frac
+                        val ty = ptTL.y + (ptBL.y - ptTL.y) * frac
+                        val ribbonEnd = Offset(tx + (ptTR.x - ptTL.x) * 0.12f, ty + (ptTR.y - ptTL.y) * 0.12f)
+
+                        drawLine(
+                            color = Color(0xFF3E2723),
+                            start = Offset(tx, ty),
+                            end = ribbonEnd,
+                            strokeWidth = 7f * zoomScale,
+                            cap = StrokeCap.Round
+                        )
+                        drawCircle(
+                            color = FoilGold,
+                            radius = 2.2f * zoomScale,
+                            center = ribbonEnd
+                        )
+                    }
+                }
+
+                else -> Unit
+            }
 
             // ONLY draw Foil stamped Title & Subtitle when explicitly provided (clean book otherwise)
             val titleToRender = foilTitle.trim()

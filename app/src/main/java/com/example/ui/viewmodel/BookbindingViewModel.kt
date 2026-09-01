@@ -10,13 +10,19 @@ import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.data.db.AppDatabase
 import com.example.data.model.BindingType
+import com.example.data.model.BookFormatOption
 import com.example.data.model.MaterialCategory
 import com.example.data.model.MaterialItem
 import com.example.data.model.OrderEntity
 import com.example.data.model.OrderStatus
+import com.example.data.model.PaperOption
 import com.example.data.model.PredefinedBindingTypes
+import com.example.data.model.PredefinedBookFormats
+import com.example.data.model.PredefinedPapers
 import com.example.data.model.QuoteCalculator
 import com.example.data.model.QuoteResult
+import com.example.data.model.SpineThicknessCalculator
+import com.example.data.model.SpineType
 import com.example.data.model.WorkshopStep
 import com.example.data.repository.BookbindingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +35,7 @@ import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.ceil
 
 enum class AppNavScreen(val title: String, val iconName: String) {
     CATALOGO("Catálogo 3D", "MenuBook"),
@@ -68,24 +75,229 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
         _currentScreen.value = screen
     }
 
-    // ==========================================
-    // 1. CATALOG & BINDING TYPES
-    // ==========================================
+    // =========================================================================
+    // 1. UNIFIED BINDING SYNCHRONIZATION (Catalog, Simulator, Cotizador)
+    // =========================================================================
     val bindingTypes: List<BindingType> = PredefinedBindingTypes.list
 
     private val _selectedCatalogBinding = MutableStateFlow(bindingTypes.first())
     val selectedCatalogBinding: StateFlow<BindingType> = _selectedCatalogBinding.asStateFlow()
 
-    fun selectCatalogBinding(binding: BindingType) {
-        _selectedCatalogBinding.value = binding
-    }
-
-    // ==========================================
-    // 2. SIMULATOR STATE (Color, Textures, Camera)
-    // ==========================================
     private val _simulatorBinding = MutableStateFlow(bindingTypes.first())
     val simulatorBinding: StateFlow<BindingType> = _simulatorBinding.asStateFlow()
 
+    private val _quoteBinding = MutableStateFlow(bindingTypes.first())
+    val quoteBinding: StateFlow<BindingType> = _quoteBinding.asStateFlow()
+
+    /**
+     * Synchronizes binding type selection across Catalog, Simulator, and Cotizador.
+     */
+    fun selectGlobalBinding(binding: BindingType, updateCoverDefaults: Boolean = true) {
+        _selectedCatalogBinding.value = binding
+        _simulatorBinding.value = binding
+        _quoteBinding.value = binding
+
+        if (updateCoverDefaults) {
+            _simulatorColorHex.value = binding.defaultColorHex
+            _simulatorHasRibbon.value = binding.hasRibbon
+            _simulatorHasCorners.value = binding.hasCornerGuards
+            _quoteCoverMaterial.value = binding.defaultCoverMaterial
+            _quoteHasRibbon.value = binding.hasRibbon
+            _quoteHasCorners.value = binding.hasCornerGuards
+        }
+    }
+
+    fun selectCatalogBinding(binding: BindingType) {
+        selectGlobalBinding(binding)
+    }
+
+    fun setSimulatorBinding(binding: BindingType) {
+        selectGlobalBinding(binding)
+    }
+
+    fun setQuoteBinding(binding: BindingType) {
+        selectGlobalBinding(binding)
+    }
+
+    // =========================================================================
+    // 2. UNIFIED BOOK PHYSICAL DIMENSIONS & SPECIFICATIONS
+    // (Largo, Ancho, Hojas, Páginas, Gramaje, Grosor de Lomo, Cuadernillos)
+    // =========================================================================
+    private val _bookFormatSize = MutableStateFlow("A5 (14.8 x 21.0 cm)")
+    val bookFormatSize: StateFlow<String> = _bookFormatSize.asStateFlow()
+
+    private val _bookWidthCm = MutableStateFlow(14.8f)
+    val bookWidthCm: StateFlow<Float> = _bookWidthCm.asStateFlow()
+
+    private val _bookLengthCm = MutableStateFlow(21.0f)
+    val bookLengthCm: StateFlow<Float> = _bookLengthCm.asStateFlow()
+
+    private val _bookSheetCount = MutableStateFlow(60) // 60 hojas
+    val bookSheetCount: StateFlow<Int> = _bookSheetCount.asStateFlow()
+
+    private val _bookPageCount = MutableStateFlow(120) // 120 páginas (60 * 2)
+    val bookPageCount: StateFlow<Int> = _bookPageCount.asStateFlow()
+
+    private val _bookGrammageGsm = MutableStateFlow(90) // 90 g/m²
+    val bookGrammageGsm: StateFlow<Int> = _bookGrammageGsm.asStateFlow()
+
+    private val _bookPaperType = MutableStateFlow("Ahuesado 90g Book Cream")
+    val bookPaperType: StateFlow<String> = _bookPaperType.asStateFlow()
+
+    private val _calculatedSpineThicknessMm = MutableStateFlow(16.0f)
+    val calculatedSpineThicknessMm: StateFlow<Float> = _calculatedSpineThicknessMm.asStateFlow()
+
+    private val _estimatedSignatures = MutableStateFlow(15)
+    val estimatedSignatures: StateFlow<Int> = _estimatedSignatures.asStateFlow()
+
+    private fun recalculateDerivedSpecs() {
+        val isHardcover = _simulatorBinding.value.spineType != SpineType.OPEN_SPINE &&
+                _simulatorBinding.value.spineType != SpineType.JAPANESE_EXTERNAL
+        val thickness = SpineThicknessCalculator.calculateThicknessMm(
+            sheetCount = _bookSheetCount.value,
+            paperGrammageGsm = _bookGrammageGsm.value,
+            isHardcover = isHardcover
+        )
+        _calculatedSpineThicknessMm.value = thickness.toFloat()
+
+        val gsm = _bookGrammageGsm.value
+        val sheetsPerSig = when {
+            gsm >= 300 -> 2
+            gsm >= 200 -> 2
+            gsm >= 160 -> 3
+            else -> 4
+        }
+        _estimatedSignatures.value = ceil(_bookSheetCount.value.toDouble() / sheetsPerSig).toInt()
+    }
+
+    fun setBookFormatOption(format: BookFormatOption) {
+        _bookFormatSize.value = format.name
+        _bookWidthCm.value = format.widthCm.toFloat()
+        _bookLengthCm.value = format.lengthCm.toFloat()
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookFormat(format: BookFormatOption) {
+        setBookFormatOption(format)
+    }
+
+    fun setBookFormatByName(formatName: String) {
+        _bookFormatSize.value = formatName
+        val matched = PredefinedBookFormats.list.find { it.name == formatName }
+        if (matched != null) {
+            _bookWidthCm.value = matched.widthCm.toFloat()
+            _bookLengthCm.value = matched.lengthCm.toFloat()
+        }
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookWidthCm(widthCm: Float) {
+        _bookWidthCm.value = widthCm.coerceIn(8f, 35f)
+        _bookFormatSize.value = "Personalizado (${String.format(Locale.US, "%.1f", _bookWidthCm.value)} x ${String.format(Locale.US, "%.1f", _bookLengthCm.value)} cm)"
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookLengthCm(lengthCm: Float) {
+        _bookLengthCm.value = lengthCm.coerceIn(10f, 45f)
+        _bookFormatSize.value = "Personalizado (${String.format(Locale.US, "%.1f", _bookWidthCm.value)} x ${String.format(Locale.US, "%.1f", _bookLengthCm.value)} cm)"
+        recalculateDerivedSpecs()
+    }
+
+    fun setCustomDimensions(widthCm: Double, lengthCm: Double) {
+        _bookWidthCm.value = widthCm.toFloat().coerceIn(8f, 35f)
+        _bookLengthCm.value = lengthCm.toFloat().coerceIn(10f, 45f)
+        _bookFormatSize.value = "Personalizado (${String.format(Locale.US, "%.1f", _bookWidthCm.value)} x ${String.format(Locale.US, "%.1f", _bookLengthCm.value)} cm)"
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookSheetCount(sheets: Int) {
+        val validSheets = sheets.coerceIn(10, 400)
+        _bookSheetCount.value = validSheets
+        _bookPageCount.value = validSheets * 2
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookPageCount(pages: Int) {
+        val validPages = pages.coerceIn(20, 800)
+        _bookPageCount.value = validPages
+        val validSheets = (validPages / 2).coerceAtLeast(10)
+        _bookSheetCount.value = validSheets
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookPaperOption(paper: PaperOption) {
+        _bookPaperType.value = paper.name
+        _bookGrammageGsm.value = paper.grammageGsm
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookPaper(paper: PaperOption) {
+        setBookPaperOption(paper)
+    }
+
+    fun setBookPaperByName(paperName: String) {
+        _bookPaperType.value = paperName
+        val matched = PredefinedPapers.list.find { it.name == paperName }
+        if (matched != null) {
+            _bookGrammageGsm.value = matched.grammageGsm
+        } else {
+            val gsm = when {
+                paperName.contains("300g", ignoreCase = true) || paperName.contains("Acuarela", ignoreCase = true) -> 300
+                paperName.contains("200g", ignoreCase = true) || paperName.contains("Sketch", ignoreCase = true) -> 200
+                paperName.contains("160g", ignoreCase = true) || paperName.contains("Bristol", ignoreCase = true) -> 160
+                paperName.contains("120g", ignoreCase = true) || paperName.contains("Kraft", ignoreCase = true) -> 120
+                paperName.contains("100g", ignoreCase = true) -> 100
+                paperName.contains("80g", ignoreCase = true) -> 80
+                else -> 90
+            }
+            _bookGrammageGsm.value = gsm
+        }
+        recalculateDerivedSpecs()
+    }
+
+    fun setBookGrammage(grammageGsm: Int) {
+        _bookGrammageGsm.value = grammageGsm
+        val matched = PredefinedPapers.list.find { it.grammageGsm == grammageGsm }
+        if (matched != null) {
+            _bookPaperType.value = matched.name
+        }
+        recalculateDerivedSpecs()
+    }
+
+    fun getSpineThicknessMm(): Double {
+        val isHardcover = _simulatorBinding.value.spineType != SpineType.OPEN_SPINE &&
+                _simulatorBinding.value.spineType != SpineType.JAPANESE_EXTERNAL
+        return SpineThicknessCalculator.calculateThicknessMm(
+            sheetCount = _bookSheetCount.value,
+            paperGrammageGsm = _bookGrammageGsm.value,
+            isHardcover = isHardcover
+        )
+    }
+
+    fun getSignaturesCount(): Int {
+        val gsm = _bookGrammageGsm.value
+        val sheetsPerSig = when {
+            gsm >= 300 -> 2
+            gsm >= 200 -> 2
+            gsm >= 160 -> 3
+            else -> 4
+        }
+        return ceil(_bookSheetCount.value.toDouble() / sheetsPerSig).toInt()
+    }
+
+    fun getCoverCutDimensionsCm(): Pair<Double, Double> {
+        val spineCm = getSpineThicknessMm() / 10.0
+        val width = (_bookWidthCm.value.toDouble() * 2) + spineCm + 4.0 // 2 cm vuelta a cada lado
+        val height = _bookLengthCm.value.toDouble() + 4.0 // 2 cm vuelta arriba y abajo
+        return Pair(
+            String.format(Locale.US, "%.1f", width).toDouble(),
+            String.format(Locale.US, "%.1f", height).toDouble()
+        )
+    }
+
+    // ==========================================
+    // 3. SIMULATOR STATE (Color, Textures, Camera)
+    // ==========================================
     private val _simulatorColorHex = MutableStateFlow(bindingTypes.first().defaultColorHex)
     val simulatorColorHex: StateFlow<Long> = _simulatorColorHex.asStateFlow()
 
@@ -116,13 +328,6 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
         TexturePreset("cuero_mostaza", "Cuero Ocre Antiguo", "Acabado rústico encerado", 0xFF8C6422),
         TexturePreset("kraft_reciclado", "Cartulina Kraft Cruda", "Textura orgánica 100% fibra", 0xFF7A6B5D)
     )
-
-    fun setSimulatorBinding(binding: BindingType) {
-        _simulatorBinding.value = binding
-        _simulatorColorHex.value = binding.defaultColorHex
-        _simulatorHasRibbon.value = binding.hasRibbon
-        _simulatorHasCorners.value = binding.hasCornerGuards
-    }
 
     fun setSimulatorColor(colorHex: Long) {
         _simulatorColorHex.value = colorHex
@@ -180,19 +385,11 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     // ==========================================
-    // 3. QUOTATION / PRESUPUESTOS
+    // 4. QUOTATION / PRESUPUESTOS
     // ==========================================
-    private val _quoteBinding = MutableStateFlow(bindingTypes.first())
-    val quoteBinding: StateFlow<BindingType> = _quoteBinding.asStateFlow()
-
-    private val _quoteFormatSize = MutableStateFlow("A5 (14.8 x 21 cm)")
-    val quoteFormatSize: StateFlow<String> = _quoteFormatSize.asStateFlow()
-
-    private val _quotePageCount = MutableStateFlow(120)
-    val quotePageCount: StateFlow<Int> = _quotePageCount.asStateFlow()
-
-    private val _quotePaperType = MutableStateFlow("Ahuesado 90g Book Cream")
-    val quotePaperType: StateFlow<String> = _quotePaperType.asStateFlow()
+    val quoteFormatSize: StateFlow<String> = _bookFormatSize.asStateFlow()
+    val quotePageCount: StateFlow<Int> = _bookPageCount.asStateFlow()
+    val quotePaperType: StateFlow<String> = _bookPaperType.asStateFlow()
 
     private val _quoteCoverMaterial = MutableStateFlow("Tela de Lino")
     val quoteCoverMaterial: StateFlow<String> = _quoteCoverMaterial.asStateFlow()
@@ -237,16 +434,9 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     private val _quoteDepositPaid = MutableStateFlow("")
     val quoteDepositPaid: StateFlow<String> = _quoteDepositPaid.asStateFlow()
 
-    fun setQuoteBinding(binding: BindingType) {
-        _quoteBinding.value = binding
-        _quoteCoverMaterial.value = binding.defaultCoverMaterial
-        _quoteHasRibbon.value = binding.hasRibbon
-        _quoteHasCorners.value = binding.hasCornerGuards
-    }
-
-    fun setQuoteFormatSize(size: String) { _quoteFormatSize.value = size }
-    fun setQuotePageCount(pages: Int) { _quotePageCount.value = pages.coerceIn(20, 800) }
-    fun setQuotePaperType(paper: String) { _quotePaperType.value = paper }
+    fun setQuoteFormatSize(size: String) { setBookFormatByName(size) }
+    fun setQuotePageCount(pages: Int) { setBookPageCount(pages) }
+    fun setQuotePaperType(paper: String) { setBookPaperByName(paper) }
     fun setQuoteCoverMaterial(material: String) { _quoteCoverMaterial.value = material }
     fun setQuoteHasRibbon(has: Boolean) { _quoteHasRibbon.value = has }
     fun setQuoteHasCorners(has: Boolean) { _quoteHasCorners.value = has }
@@ -266,9 +456,9 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     fun getCalculatedQuote(): QuoteResult {
         return QuoteCalculator.calculate(
             bindingType = _quoteBinding.value,
-            pageCount = _quotePageCount.value,
-            formatSize = _quoteFormatSize.value,
-            paperType = _quotePaperType.value,
+            pageCount = _bookPageCount.value,
+            formatSize = _bookFormatSize.value,
+            paperType = _bookPaperType.value,
             coverMaterial = _quoteCoverMaterial.value,
             hasRibbon = _quoteHasRibbon.value,
             hasMetalCorners = _quoteHasCorners.value,
@@ -277,17 +467,21 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
             hasSlipcase = _quoteHasSlipcase.value,
             hasFoil = _quoteHasFoil.value,
             quantity = _quoteQuantity.value,
-            customDiscountPercent = _quoteCustomDiscount.value
+            customDiscountPercent = _quoteCustomDiscount.value,
+            widthCmOverride = _bookWidthCm.value.toDouble(),
+            lengthCmOverride = _bookLengthCm.value.toDouble(),
+            grammageOverride = _bookGrammageGsm.value,
+            sheetCountOverride = _bookSheetCount.value
         )
     }
 
     fun prepareQuotationFromCatalog(binding: BindingType) {
-        setQuoteBinding(binding)
+        selectGlobalBinding(binding)
         navigateTo(AppNavScreen.COTIZADOR)
     }
 
     fun prepareQuotationFromSimulator() {
-        setQuoteBinding(_simulatorBinding.value)
+        selectGlobalBinding(_simulatorBinding.value)
         navigateTo(AppNavScreen.COTIZADOR)
     }
 
@@ -309,9 +503,9 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
                 customerNotes = _quoteCustomerNotes.value,
                 bindingTypeId = _quoteBinding.value.id,
                 bindingTypeName = _quoteBinding.value.name,
-                formatSize = _quoteFormatSize.value,
-                pageCount = _quotePageCount.value,
-                paperType = _quotePaperType.value,
+                formatSize = "${_bookFormatSize.value} (${_bookWidthCm.value}x${_bookLengthCm.value} cm, ${_bookSheetCount.value} hojas, ${_bookGrammageGsm.value}g)",
+                pageCount = _bookPageCount.value,
+                paperType = _bookPaperType.value,
                 coverMaterial = _quoteCoverMaterial.value,
                 coverColorHex = _simulatorColorHex.value,
                 foilTitle = _simulatorFoilTitle.value,

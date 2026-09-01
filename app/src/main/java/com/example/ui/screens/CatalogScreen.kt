@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DesignServices
@@ -32,6 +34,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,6 +44,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,8 +71,25 @@ fun CatalogScreen(
     viewModel: BookbindingViewModel,
     modifier: Modifier = Modifier
 ) {
-    val bindingTypes = viewModel.bindingTypes
+    val allBindingTypes = viewModel.bindingTypes
     val selectedBinding by viewModel.selectedCatalogBinding.collectAsState()
+    val widthCm by viewModel.bookWidthCm.collectAsState()
+    val lengthCm by viewModel.bookLengthCm.collectAsState()
+    val sheetCount by viewModel.bookSheetCount.collectAsState()
+    val grammageGsm by viewModel.bookGrammageGsm.collectAsState()
+    val spineThicknessMm by viewModel.calculatedSpineThicknessMm.collectAsState()
+    val formatSize by viewModel.bookFormatSize.collectAsState()
+
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    val categories = remember(allBindingTypes) {
+        allBindingTypes.map { it.category }.distinct()
+    }
+
+    val displayedBindings = if (selectedCategory == null) {
+        allBindingTypes
+    } else {
+        allBindingTypes.filter { it.category == selectedCategory }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -88,7 +112,7 @@ fun CatalogScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Modelos 3D interactivos en tiempo real con acabados artesanales.",
+                    text = "Modelos 3D interactivos sincronizados con el simulador y cotizador.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -127,7 +151,7 @@ fun CatalogScreen(
                                     )
                                 }
                                 Text(
-                                    text = selectedBinding.subtitle,
+                                    text = "${selectedBinding.category} • ${selectedBinding.subtitle}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(start = 24.dp, top = 2.dp)
@@ -151,7 +175,7 @@ fun CatalogScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // 3D Canvas Box (No text on the cover itself)
+                        // 3D Canvas Box
                         Book3DViewer(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -164,7 +188,12 @@ fun CatalogScreen(
                             foilColorType = "Dorado",
                             hasRibbon = selectedBinding.hasRibbon,
                             hasCornerGuards = selectedBinding.hasCornerGuards,
-                            showControls = true
+                            showControls = true,
+                            widthCm = widthCm,
+                            lengthCm = lengthCm,
+                            spineThicknessMm = spineThicknessMm,
+                            sheetCount = sheetCount,
+                            grammageGsm = grammageGsm
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -176,7 +205,7 @@ fun CatalogScreen(
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    viewModel.setSimulatorBinding(selectedBinding)
+                                    viewModel.selectGlobalBinding(selectedBinding)
                                     viewModel.navigateTo(AppNavScreen.SIMULADOR)
                                 },
                                 modifier = Modifier
@@ -210,26 +239,55 @@ fun CatalogScreen(
             }
         }
 
-        // Section Title
+        // Section Title & Category Filter Chips
         item {
-            Text(
-                text = "Tipos de Encuadernación Disponibles",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    text = "Tipos de Encuadernación Disponibles",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategory == null,
+                            onClick = { selectedCategory = null },
+                            label = { Text("Todas (${allBindingTypes.size})") },
+                            leadingIcon = if (selectedCategory == null) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
+                        )
+                    }
+                    items(categories) { cat ->
+                        val count = allBindingTypes.count { it.category == cat }
+                        val isSel = selectedCategory == cat
+                        FilterChip(
+                            selected = isSel,
+                            onClick = { selectedCategory = if (isSel) null else cat },
+                            label = { Text("$cat ($count)") },
+                            leadingIcon = if (isSel) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
+                        )
+                    }
+                }
+            }
         }
 
         // Binding Types List Cards
-        items(bindingTypes, key = { it.id }) { binding ->
+        items(displayedBindings, key = { it.id }) { binding ->
             val isSelected = binding.id == selectedBinding.id
 
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .clickable { viewModel.selectCatalogBinding(binding) }
+                    .clickable { viewModel.selectGlobalBinding(binding) }
                     .testTag("binding_card_${binding.id}"),
                 shape = RoundedCornerShape(16.dp),
                 border = androidx.compose.foundation.BorderStroke(
