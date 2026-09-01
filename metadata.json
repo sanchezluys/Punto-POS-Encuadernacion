@@ -1,0 +1,6 @@
+{
+  "name": "Encuadernación",
+  "description": "Gestión integral de taller de encuadernación artesanal: catálogo 3D interactivo con rotación en tiempo real, simulador de texturas y materiales con cámara, cotizador automático de presupuestos, seguimiento de estados de pedidos, control de inventario y remitos de entrega offline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
