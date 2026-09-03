@@ -77,5 +77,58 @@ data class OrderEntity(
     val receiverName: String = "",
     val receiverDniOrPhone: String = "",
     val deliveryNotes: String = "",
-    val isDeliverySigned: Boolean = false
+    val isDeliverySigned: Boolean = false,
+    
+    // Step change history with optional notes
+    val stepNotesJson: String = "[]"
+) {
+    fun getStepLogs(): List<StepLogEntry> {
+        return try {
+            val array = org.json.JSONArray(stepNotesJson)
+            val list = mutableListOf<StepLogEntry>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(
+                    StepLogEntry(
+                        timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
+                        stepName = obj.optString("stepName", ""),
+                        statusName = obj.optString("statusName", ""),
+                        note = obj.optString("note", "")
+                    )
+                )
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun withAddedStepLog(stepName: String, statusName: String, note: String): OrderEntity {
+        val existing = getStepLogs().toMutableList()
+        existing.add(
+            StepLogEntry(
+                timestamp = System.currentTimeMillis(),
+                stepName = stepName,
+                statusName = statusName,
+                note = note.trim()
+            )
+        )
+        val array = org.json.JSONArray()
+        for (item in existing) {
+            val obj = org.json.JSONObject()
+            obj.put("timestamp", item.timestamp)
+            obj.put("stepName", item.stepName)
+            obj.put("statusName", item.statusName)
+            obj.put("note", item.note)
+            array.put(obj)
+        }
+        return copy(stepNotesJson = array.toString())
+    }
+}
+
+data class StepLogEntry(
+    val timestamp: Long = System.currentTimeMillis(),
+    val stepName: String,
+    val statusName: String,
+    val note: String = ""
 )

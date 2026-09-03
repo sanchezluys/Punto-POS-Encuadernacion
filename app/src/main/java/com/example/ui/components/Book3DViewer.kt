@@ -20,20 +20,27 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -43,12 +50,16 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.RectangleShape
+import com.example.ui.theme.GoldenOchre
+import com.example.ui.theme.SaddleBrown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -133,24 +144,44 @@ fun Book3DViewer(
     hasCornerGuards: Boolean = bindingType.hasCornerGuards,
     ribbonColor: Color = Color(0xFFC41E3A), // Wine/Ruby ribbon
     showControls: Boolean = true,
+    isFullScreen: Boolean = false,
+    onCloseFullscreen: (() -> Unit)? = null,
+    onQuoteClick: (() -> Unit)? = null,
     initialYaw: Float = -25f,
     initialPitch: Float = 15f,
     widthCm: Float = 14.8f,
     lengthCm: Float = 21.0f,
     spineThicknessMm: Float = 16.0f,
     sheetCount: Int = 60,
-    grammageGsm: Int = 90
+    grammageGsm: Int = 90,
+    estimatedSignatures: Int = 15,
+    sheetsPerSignature: Int = 4,
+    currentYaw: Float? = null,
+    currentPitch: Float? = null,
+    currentZoom: Float? = null,
+    currentOpenAngle: Float? = null,
+    onTransformChanged: ((yaw: Float, pitch: Float, zoom: Float, openAngle: Float) -> Unit)? = null,
+    onColorSelected: ((Long) -> Unit)? = null
 ) {
-    var yawDeg by remember { mutableFloatStateOf(initialYaw) }
-    var pitchDeg by remember { mutableFloatStateOf(initialPitch) }
-    var zoomScale by remember { mutableFloatStateOf(1.0f) }
-    var openAngleDeg by remember { mutableFloatStateOf(0f) }
+    var yawDeg by rememberSaveable { mutableFloatStateOf(currentYaw ?: initialYaw) }
+    var pitchDeg by rememberSaveable { mutableFloatStateOf(currentPitch ?: initialPitch) }
+    var zoomScale by rememberSaveable { mutableFloatStateOf(currentZoom ?: 1.0f) }
+    var openAngleDeg by rememberSaveable { mutableFloatStateOf(currentOpenAngle ?: 0f) }
     var isAutoRotating by remember { mutableStateOf(false) }
+
+    // Synchronize if external state changes from outside
+    LaunchedEffect(currentYaw, currentPitch, currentZoom, currentOpenAngle) {
+        if (currentYaw != null && currentYaw != yawDeg) yawDeg = currentYaw
+        if (currentPitch != null && currentPitch != pitchDeg) pitchDeg = currentPitch
+        if (currentZoom != null && currentZoom != zoomScale) zoomScale = currentZoom
+        if (currentOpenAngle != null && currentOpenAngle != openAngleDeg) openAngleDeg = currentOpenAngle
+    }
 
     // Auto-rotation effect
     LaunchedEffect(isAutoRotating) {
         while (isAutoRotating) {
             yawDeg = (yawDeg + 1.2f) % 360f
+            onTransformChanged?.invoke(yawDeg, pitchDeg, zoomScale, openAngleDeg)
             delay(16)
         }
     }
@@ -161,8 +192,20 @@ fun Book3DViewer(
         label = "openAngle"
     )
 
-    Box(
-        modifier = modifier
+    val containerModifier = if (isFullScreen) {
+        modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF2E2722),
+                        Color(0xFF1A1613),
+                        Color(0xFF0C0A09)
+                    )
+                )
+            )
+    } else {
+        modifier
             .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.radialGradient(
@@ -173,12 +216,17 @@ fun Book3DViewer(
                     )
                 )
             )
+    }
+
+    Box(
+        modifier = containerModifier
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     isAutoRotating = false
-                    zoomScale = (zoomScale * zoom).coerceIn(0.55f, 2.4f)
-                    yawDeg += pan.x * 0.45f
+                    zoomScale = (zoomScale * zoom).coerceIn(0.55f, 2.6f)
+                    yawDeg = (yawDeg + pan.x * 0.45f) % 360f
                     pitchDeg = (pitchDeg - pan.y * 0.4f).coerceIn(-75f, 75f)
+                    onTransformChanged?.invoke(yawDeg, pitchDeg, zoomScale, openAngleDeg)
                 }
             }
             .pointerInput(Unit) {
@@ -188,10 +236,11 @@ fun Book3DViewer(
                         yawDeg = initialYaw
                         pitchDeg = initialPitch
                         isAutoRotating = false
+                        onTransformChanged?.invoke(yawDeg, pitchDeg, zoomScale, openAngleDeg)
                     }
                 )
             }
-            .testTag("book_3d_canvas_container")
+            .testTag(if (isFullScreen) "book_3d_fullscreen_container" else "book_3d_canvas_container")
     ) {
         Canvas(modifier = Modifier.fillMaxSize().testTag("book_3d_canvas")) {
             val cx = size.width / 2f
@@ -215,146 +264,288 @@ fun Book3DViewer(
                 ribbonColor = ribbonColor,
                 widthCm = widthCm,
                 lengthCm = lengthCm,
-                spineThicknessMm = spineThicknessMm
+                spineThicknessMm = spineThicknessMm,
+                estimatedSignatures = estimatedSignatures
             )
         }
 
         // Overlay controls
         if (showControls) {
-            Column(
-                modifier = Modifier
+            val overlayModifier = if (isFullScreen) {
+                Modifier
                     .fillMaxSize()
-                    .padding(10.dp),
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(14.dp)
+            } else {
+                Modifier
+                    .fillMaxSize()
+                    .padding(10.dp)
+            }
+
+            Column(
+                modifier = overlayModifier,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Top Action Bar inside 3D viewer
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Interaction guidance pill with current Dimensions and Zoom display
-                    Surface(
-                        color = Color.White.copy(alpha = 0.94f),
-                        shape = RoundedCornerShape(20.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE1E2EC)),
-                        modifier = Modifier.padding(2.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Left: Back/Close button in fullscreen or binding badge
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Visibility,
-                                contentDescription = "3D Realtime",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${widthCm}x${lengthCm} cm • Lomo ${spineThicknessMm}mm • Zoom ${(zoomScale * 100).toInt()}%",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            if (isFullScreen && onCloseFullscreen != null) {
+                                IconButton(
+                                    onClick = onCloseFullscreen,
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(Color(0xDD1F1B18), CircleShape)
+                                        .border(1.dp, GoldenOchre.copy(alpha = 0.5f), CircleShape)
+                                        .testTag("btn_close_fullscreen_3d")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Cerrar Pantalla Completa",
+                                        tint = GoldenOchre,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            // Interaction guidance pill with current Dimensions and Zoom display
+                            Surface(
+                                color = if (isFullScreen) Color(0xDD1E1A17) else Color.White.copy(alpha = 0.94f),
+                                shape = RoundedCornerShape(20.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isFullScreen) GoldenOchre.copy(alpha = 0.4f) else Color(0xFFE1E2EC)
+                                ),
+                                modifier = Modifier.padding(2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Visibility,
+                                        contentDescription = "3D Realtime",
+                                        tint = if (isFullScreen) GoldenOchre else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isFullScreen) {
+                                            "${bindingType.name} • ${widthCm}×${lengthCm} cm • Lomo ${spineThicknessMm}mm"
+                                        } else {
+                                            "${widthCm}x${lengthCm} cm • Lomo ${spineThicknessMm}mm • Zoom ${(zoomScale * 100).toInt()}%"
+                                        },
+                                        color = if (isFullScreen) Color.White else MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        // Floating 3D Action Tools
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Zoom Out Button
+                            IconButton(
+                                onClick = {
+                                    zoomScale = (zoomScale - 0.2f).coerceIn(0.55f, 2.6f)
+                                },
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .background(
+                                        if (isFullScreen) Color(0xDD1E1A17) else Color.White.copy(alpha = 0.94f),
+                                        CircleShape
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isFullScreen) Color(0xFF4A3E34) else Color(0xFFE1E2EC),
+                                        CircleShape
+                                    )
+                                    .testTag("btn_zoom_out")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Remove,
+                                    contentDescription = "Alejar Zoom",
+                                    tint = if (isFullScreen) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            // Zoom In Button
+                            IconButton(
+                                onClick = {
+                                    zoomScale = (zoomScale + 0.2f).coerceIn(0.55f, 2.6f)
+                                },
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .background(
+                                        if (isFullScreen) Color(0xDD1E1A17) else Color.White.copy(alpha = 0.94f),
+                                        CircleShape
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isFullScreen) Color(0xFF4A3E34) else Color(0xFFE1E2EC),
+                                        CircleShape
+                                    )
+                                    .testTag("btn_zoom_in")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Acercar Zoom",
+                                    tint = if (isFullScreen) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            // Auto-spin toggle
+                            IconButton(
+                                onClick = { isAutoRotating = !isAutoRotating },
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .background(
+                                        if (isAutoRotating) GoldenOchre else if (isFullScreen) Color(0xDD1E1A17) else Color.White.copy(alpha = 0.94f),
+                                        CircleShape
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isAutoRotating) GoldenOchre else if (isFullScreen) Color(0xFF4A3E34) else Color(0xFFE1E2EC),
+                                        CircleShape
+                                    )
+                                    .testTag("btn_auto_rotate")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoMode,
+                                    contentDescription = "Auto Giro",
+                                    tint = if (isAutoRotating) Color.Black else if (isFullScreen) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            // Reset View & Zoom
+                            IconButton(
+                                onClick = {
+                                    yawDeg = initialYaw
+                                    pitchDeg = initialPitch
+                                    zoomScale = 1.0f
+                                    isAutoRotating = false
+                                },
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .background(
+                                        if (isFullScreen) Color(0xDD1E1A17) else Color.White.copy(alpha = 0.94f),
+                                        CircleShape
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isFullScreen) Color(0xFF4A3E34) else Color(0xFFE1E2EC),
+                                        CircleShape
+                                    )
+                                    .testTag("btn_reset_view")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RestartAlt,
+                                    contentDescription = "Reset Vista",
+                                    tint = if (isFullScreen) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
 
-                    // Floating 3D Action Tools
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Zoom Out Button
-                        IconButton(
-                            onClick = {
-                                zoomScale = (zoomScale - 0.2f).coerceIn(0.55f, 2.4f)
-                            },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(Color.White.copy(alpha = 0.94f), CircleShape)
-                                .border(1.dp, Color(0xFFE1E2EC), CircleShape)
-                                .testTag("btn_zoom_out")
+                    // In Fullscreen mode: Quick camera perspective angle presets chips
+                    if (isFullScreen) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Remove,
-                                contentDescription = "Alejar Zoom",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            listOf(
+                                "3D Perspectiva" to Pair(-25f, 15f),
+                                "Portada" to Pair(0f, 0f),
+                                "Lomo" to Pair(-90f, 0f),
+                                "Contraportada" to Pair(180f, 0f),
+                                "Cenital" to Pair(0f, 75f)
+                            ).forEach { (label, angles) ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xCC2A2420),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldenOchre.copy(alpha = 0.35f)),
+                                    modifier = Modifier.clickable {
+                                        yawDeg = angles.first
+                                        pitchDeg = angles.second
+                                        isAutoRotating = false
+                                        onTransformChanged?.invoke(yawDeg, pitchDeg, zoomScale, openAngleDeg)
+                                    }
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = GoldenOchre,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
                         }
+                    }
 
-                        // Zoom In Button
-                        IconButton(
-                            onClick = {
-                                zoomScale = (zoomScale + 0.2f).coerceIn(0.55f, 2.4f)
-                            },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(Color.White.copy(alpha = 0.94f), CircleShape)
-                                .border(1.dp, Color(0xFFE1E2EC), CircleShape)
-                                .testTag("btn_zoom_in")
+                    if (isFullScreen && onColorSelected != null) {
+                        val quickColors = listOf(
+                            0xFF1F1B18 to "Negro",
+                            0xFF4A2511 to "Habana",
+                            0xFF8B2500 to "Teja",
+                            0xFF5C1D24 to "Burdeos",
+                            0xFF1B365D to "Azul",
+                            0xFF1E3F20 to "Verde",
+                            0xFFC59B27 to "Ocre",
+                            0xFFFAF0E6 to "Lino"
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Acercar Zoom",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        // Auto-spin toggle
-                        IconButton(
-                            onClick = { isAutoRotating = !isAutoRotating },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    if (isAutoRotating) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = 0.94f),
-                                    CircleShape
+                            Text("Color:", fontSize = 10.sp, color = GoldenOchre, fontWeight = FontWeight.Bold)
+                            quickColors.forEach { (colorHex, _) ->
+                                val isSel = (coverColor.value.toLong() and 0xFFFFFFFFL) == (colorHex and 0xFFFFFFFFL)
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(colorHex))
+                                        .border(
+                                            width = if (isSel) 2.dp else 1.dp,
+                                            color = if (isSel) GoldenOchre else Color.White.copy(alpha = 0.4f),
+                                            shape = CircleShape
+                                        )
+                                        .clickable { onColorSelected(colorHex) }
                                 )
-                                .border(1.dp, if (isAutoRotating) MaterialTheme.colorScheme.primary else Color(0xFFE1E2EC), CircleShape)
-                                .testTag("btn_auto_rotate")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoMode,
-                                contentDescription = "Auto Giro",
-                                tint = if (isAutoRotating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        // Reset View & Zoom
-                        IconButton(
-                            onClick = {
-                                yawDeg = initialYaw
-                                pitchDeg = initialPitch
-                                zoomScale = 1.0f
-                                isAutoRotating = false
-                            },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(Color.White.copy(alpha = 0.94f), CircleShape)
-                                .border(1.dp, Color(0xFFE1E2EC), CircleShape)
-                                .testTag("btn_reset_view")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.RestartAlt,
-                                contentDescription = "Reset Vista",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            }
                         }
                     }
                 }
 
                 // Bottom control panel for Book Opening Angle & Presets
                 Surface(
-                    color = Color.White.copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(14.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE1E2EC)),
+                    color = if (isFullScreen) Color(0xEE1A1613) else Color.White.copy(alpha = 0.95f),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isFullScreen) GoldenOchre.copy(alpha = 0.35f) else Color(0xFFE1E2EC)
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -364,14 +555,14 @@ fun Book3DViewer(
                                 Icon(
                                     imageVector = Icons.Default.MenuBook,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(15.dp)
+                                    tint = if (isFullScreen) GoldenOchre else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Apertura: ${openAngleDeg.toInt()}°",
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 11.sp,
+                                    text = "Apertura de tapas: ${openAngleDeg.toInt()}°",
+                                    color = if (isFullScreen) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -379,22 +570,34 @@ fun Book3DViewer(
                             // Quick preset tags
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 listOf(
-                                    "Cerrado" to 0f,
+                                    "Cerrado 0°" to 0f,
                                     "45°" to 45f,
-                                    "100°" to 100f
+                                    "90°" to 90f,
+                                    "Plano 180°" to 180f
                                 ).forEach { (label, deg) ->
                                     val isCurrent = (openAngleDeg == deg)
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else Color(0xFFF3F3FA),
-                                        modifier = Modifier.clickable { openAngleDeg = deg }
+                                        color = if (isCurrent) {
+                                            if (isFullScreen) GoldenOchre else MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            if (isFullScreen) Color(0xFF2A231E) else Color(0xFFF3F3FA)
+                                        },
+                                        modifier = Modifier.clickable {
+                                            openAngleDeg = deg
+                                            onTransformChanged?.invoke(yawDeg, pitchDeg, zoomScale, openAngleDeg)
+                                        }
                                     ) {
                                         Text(
                                             text = label,
-                                            fontSize = 9.5.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            color = if (isCurrent) {
+                                                if (isFullScreen) Color.Black else MaterialTheme.colorScheme.onPrimaryContainer
+                                            } else {
+                                                if (isFullScreen) Color(0xFFD4C8BC) else MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                         )
                                     }
                                 }
@@ -403,15 +606,58 @@ fun Book3DViewer(
 
                         Slider(
                             value = openAngleDeg,
-                            onValueChange = { openAngleDeg = it },
-                            valueRange = 0f..140f,
+                            onValueChange = {
+                                openAngleDeg = it
+                                onTransformChanged?.invoke(yawDeg, pitchDeg, zoomScale, openAngleDeg)
+                            },
+                            valueRange = 0f..180f,
                             colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.primaryContainer
+                                thumbColor = if (isFullScreen) GoldenOchre else MaterialTheme.colorScheme.primary,
+                                activeTrackColor = if (isFullScreen) GoldenOchre else MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = if (isFullScreen) Color(0xFF382F28) else MaterialTheme.colorScheme.primaryContainer
                             ),
                             modifier = Modifier.height(24.dp).testTag("slider_open_angle")
                         )
+
+                        // If in fullscreen and actions exist, show quick action buttons
+                        if (isFullScreen && (onQuoteClick != null || onCloseFullscreen != null)) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (onQuoteClick != null) {
+                                    Button(
+                                        onClick = onQuoteClick,
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = SaddleBrown,
+                                            contentColor = Color.White
+                                        ),
+                                        modifier = Modifier.weight(1f).testTag("btn_fullscreen_quote")
+                                    ) {
+                                        Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Cotizar este Modelo", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                if (onCloseFullscreen != null) {
+                                    Button(
+                                        onClick = onCloseFullscreen,
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF332A24),
+                                            contentColor = Color.White
+                                        ),
+                                        modifier = Modifier.weight(0.7f).testTag("btn_fullscreen_back")
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Volver", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -437,7 +683,8 @@ private fun DrawScope.draw3DBook(
     ribbonColor: Color,
     widthCm: Float = 14.8f,
     lengthCm: Float = 21.0f,
-    spineThicknessMm: Float = 16.0f
+    spineThicknessMm: Float = 16.0f,
+    estimatedSignatures: Int = 15
 ) {
     val yawRad = (yawDeg * PI / 180f).toFloat()
     val pitchRad = (pitchDeg * PI / 180f).toFloat()
@@ -809,8 +1056,9 @@ private fun DrawScope.draw3DBook(
             when (bindingType.spineType) {
                 SpineType.OPEN_SPINE -> {
                     // Signatures horizontal folds & sewing thread stations
-                    for (sig in 1..12) {
-                        val frac = sig / 13f
+                    val numSigs = estimatedSignatures.coerceIn(4, 25)
+                    for (sig in 1 until numSigs) {
+                        val frac = sig.toFloat() / numSigs
                         val sx1 = spTop.x + (spBottom.x - spTop.x) * frac
                         val sy1 = spTop.y + (spBottom.y - spTop.y) * frac
                         val sx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
@@ -854,8 +1102,9 @@ private fun DrawScope.draw3DBook(
 
                 SpineType.EXPOSED_COPTIC -> {
                     // Exposed signature folds behind the chain stitches
-                    for (sig in 1..10) {
-                        val frac = sig / 11f
+                    val numSigs = estimatedSignatures.coerceIn(4, 25)
+                    for (sig in 1 until numSigs) {
+                        val frac = sig.toFloat() / numSigs
                         val sx1 = spTop.x + (spBottom.x - spTop.x) * frac
                         val sy1 = spTop.y + (spBottom.y - spTop.y) * frac
                         val sx2 = spRightTop.x + (spRightBottom.x - spRightTop.x) * frac
@@ -1427,46 +1676,59 @@ private fun DrawScope.draw3DBook(
                     else -> android.graphics.Color.rgb(255, 215, 0) // Gold
                 }
 
-                drawIntoCanvas { canvas ->
-                    val centerCover = Offset(
-                        (inTL.x + inTR.x + inBR.x + inBL.x) / 4f,
-                        (inTL.y + inTR.y + inBR.y + inBL.y) / 4f
-                    )
+                // Ensure front cover is facing towards the camera (positive cross product)
+                val v1x = inTR.x - inTL.x
+                val v1y = inTR.y - inTL.y
+                val v2x = inBL.x - inTL.x
+                val v2y = inBL.y - inTL.y
+                val isCoverFacing = (v1x * v2y - v1y * v2x) > 0f
 
-                    val dx = inTR.x - inTL.x
-                    val dy = inTR.y - inTL.y
-                    val rotationAngle = (Math.atan2(dy.toDouble(), dx.toDouble()) * 180 / Math.PI).toFloat()
+                if (isCoverFacing) {
+                    drawIntoCanvas { canvas ->
+                        val centerCover = Offset(
+                            (inTL.x + inTR.x + inBR.x + inBL.x) / 4f,
+                            (inTL.y + inTR.y + inBR.y + inBL.y) / 4f
+                        )
 
-                    canvas.nativeCanvas.save()
-                    canvas.nativeCanvas.translate(centerCover.x, centerCover.y)
-                    canvas.nativeCanvas.rotate(rotationAngle)
+                        val dx = inTR.x - inTL.x
+                        val dy = inTR.y - inTL.y
+                        var rotationAngle = (Math.atan2(dy.toDouble(), dx.toDouble()) * 180 / Math.PI).toFloat()
 
-                    if (titleToRender.isNotEmpty()) {
-                        val textPaint = NativePaint().apply {
-                            color = foilPaintColor
-                            textSize = 30f * zoomScale
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            isFakeBoldText = true
-                            isAntiAlias = true
-                            setShadowLayer(3f * zoomScale, 1f, 1f, android.graphics.Color.argb(160, 0, 0, 0))
+                        // Keep text right side up and horizontal when viewed from front
+                        while (rotationAngle > 90f) rotationAngle -= 180f
+                        while (rotationAngle < -90f) rotationAngle += 180f
+
+                        canvas.nativeCanvas.save()
+                        canvas.nativeCanvas.translate(centerCover.x, centerCover.y)
+                        canvas.nativeCanvas.rotate(rotationAngle)
+
+                        if (titleToRender.isNotEmpty()) {
+                            val textPaint = NativePaint().apply {
+                                color = foilPaintColor
+                                textSize = 30f * zoomScale
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                isFakeBoldText = true
+                                isAntiAlias = true
+                                setShadowLayer(3f * zoomScale, 1f, 1f, android.graphics.Color.argb(160, 0, 0, 0))
+                            }
+                            val yOffset = if (subtitleToRender.isNotEmpty()) -8f * zoomScale else 6f * zoomScale
+                            canvas.nativeCanvas.drawText(titleToRender, 0f, yOffset, textPaint)
                         }
-                        val yOffset = if (subtitleToRender.isNotEmpty()) -8f * zoomScale else 6f * zoomScale
-                        canvas.nativeCanvas.drawText(titleToRender, 0f, yOffset, textPaint)
-                    }
 
-                    if (subtitleToRender.isNotEmpty()) {
-                        val subTextPaint = NativePaint().apply {
-                            color = foilPaintColor
-                            textSize = 16f * zoomScale
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            isAntiAlias = true
-                            letterSpacing = 0.15f
-                            setShadowLayer(2f * zoomScale, 1f, 1f, android.graphics.Color.argb(140, 0, 0, 0))
+                        if (subtitleToRender.isNotEmpty()) {
+                            val subTextPaint = NativePaint().apply {
+                                color = foilPaintColor
+                                textSize = 16f * zoomScale
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                isAntiAlias = true
+                                letterSpacing = 0.15f
+                                setShadowLayer(2f * zoomScale, 1f, 1f, android.graphics.Color.argb(140, 0, 0, 0))
+                            }
+                            canvas.nativeCanvas.drawText(subtitleToRender, 0f, 22f * zoomScale, subTextPaint)
                         }
-                        canvas.nativeCanvas.drawText(subtitleToRender, 0f, 22f * zoomScale, subTextPaint)
-                    }
 
-                    canvas.nativeCanvas.restore()
+                        canvas.nativeCanvas.restore()
+                    }
                 }
             }
 
@@ -1543,8 +1805,9 @@ private fun DrawScope.draw3DBook(
         )
     }
 
-    // Sort polygons from back to front by distance to camera
-    val sortedPolygons = polygons.sortedBy { it.avgZ }
+    // Sort polygons from back to front by distance to camera (Painter's algorithm):
+    // Highest Z is farthest from camera (rendered first), lowest Z is closest (rendered last on top)
+    val sortedPolygons = polygons.sortedByDescending { it.avgZ }
 
     // Execute drawing for each polygon
     for (poly in sortedPolygons) {

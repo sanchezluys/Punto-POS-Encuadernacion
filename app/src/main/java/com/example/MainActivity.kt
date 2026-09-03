@@ -2,6 +2,7 @@ package com.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -67,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.OrderStatus
+import com.example.ui.components.Book3DViewer
 import com.example.ui.screens.CatalogScreen
 import com.example.ui.screens.DeliveryScreen
 import com.example.ui.screens.InventoryScreen
@@ -99,192 +101,243 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppContent(viewModel: BookbindingViewModel) {
+    val is3DFullscreenActive by viewModel.is3DFullscreenActive.collectAsState()
     val currentScreen by viewModel.currentScreen.collectAsState()
     val orders by viewModel.allOrders.collectAsState()
     val lowStockMaterials by viewModel.lowStockMaterials.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val pendingOrdersCount = orders.count { it.status == OrderStatus.EN_TALLER || it.status == OrderStatus.CONFIRMADO }
-    val readyToDeliverCount = orders.count { it.status == OrderStatus.TERMINADO }
-
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("main_app_scaffold"),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.MenuBook,
-                                    contentDescription = "Logo",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "Encuadernación",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Binding Studio Offline",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                actions = {
-                    // Quick indicator of active workshop jobs
-                    if (pendingOrdersCount > 0) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(end = 12.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "$pendingOrdersCount en taller",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                tonalElevation = 0.dp,
-                modifier = Modifier.testTag("main_navigation_bar")
-            ) {
-                AppNavScreen.values().forEach { screen ->
-                    val isSelected = currentScreen == screen
-                    val icon = getScreenIcon(screen)
-
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { viewModel.navigateTo(screen) },
-                        icon = {
-                            when (screen) {
-                                AppNavScreen.PEDIDOS -> {
-                                    if (pendingOrdersCount > 0) {
-                                        BadgedBox(
-                                            badge = {
-                                                Badge(
-                                                    containerColor = MaterialTheme.colorScheme.primary,
-                                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                                ) { Text("$pendingOrdersCount") }
-                                            }
-                                        ) {
-                                            Icon(icon, contentDescription = screen.title)
-                                        }
-                                    } else {
-                                        Icon(icon, contentDescription = screen.title)
-                                    }
-                                }
-                                AppNavScreen.ENTREGAS -> {
-                                    if (readyToDeliverCount > 0) {
-                                        BadgedBox(
-                                            badge = {
-                                                Badge(
-                                                    containerColor = MaterialTheme.colorScheme.primary,
-                                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                                ) { Text("$readyToDeliverCount") }
-                                            }
-                                        ) {
-                                            Icon(icon, contentDescription = screen.title)
-                                        }
-                                    } else {
-                                        Icon(icon, contentDescription = screen.title)
-                                    }
-                                }
-                                AppNavScreen.INVENTARIO -> {
-                                    if (lowStockMaterials.isNotEmpty()) {
-                                        BadgedBox(
-                                            badge = { Badge(containerColor = MaterialTheme.colorScheme.error) { Text("!") } }
-                                        ) {
-                                            Icon(icon, contentDescription = screen.title)
-                                        }
-                                    } else {
-                                        Icon(icon, contentDescription = screen.title)
-                                    }
-                                }
-                                else -> {
-                                    Icon(icon, contentDescription = screen.title)
-                                }
-                            }
-                        },
-                        label = {
-                            Text(
-                                text = when (screen) {
-                                    AppNavScreen.CATALOGO -> "Catálogo"
-                                    AppNavScreen.SIMULADOR -> "Simulador"
-                                    AppNavScreen.COTIZADOR -> "Cotizador"
-                                    AppNavScreen.PEDIDOS -> "Taller"
-                                    AppNavScreen.ENTREGAS -> "Entregas"
-                                    AppNavScreen.INVENTARIO -> "Stock"
-                                },
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier.testTag("nav_item_${screen.name.lowercase()}")
-                    )
-                }
-            }
+    if (is3DFullscreenActive) {
+        BackHandler {
+            viewModel.close3DFullscreen()
         }
-    ) { innerPadding ->
-        AnimatedContent(
-            targetState = currentScreen,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
+
+        val simulatorBinding by viewModel.simulatorBinding.collectAsState()
+        val coverColorHex by viewModel.simulatorColorHex.collectAsState()
+        val customBitmap by viewModel.simulatorCustomBitmap.collectAsState()
+        val foilTitle by viewModel.simulatorFoilTitle.collectAsState()
+        val foilSubtitle by viewModel.simulatorFoilSubtitle.collectAsState()
+        val foilColor by viewModel.simulatorFoilColor.collectAsState()
+        val hasRibbon by viewModel.simulatorHasRibbon.collectAsState()
+        val hasCorners by viewModel.simulatorHasCorners.collectAsState()
+        val bookWidthCm by viewModel.bookWidthCm.collectAsState()
+        val bookLengthCm by viewModel.bookLengthCm.collectAsState()
+        val spineThicknessMm by viewModel.calculatedSpineThicknessMm.collectAsState()
+        val bookSheetCount by viewModel.bookSheetCount.collectAsState()
+        val bookGrammageGsm by viewModel.bookGrammageGsm.collectAsState()
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            label = "screen_transition"
-        ) { screen ->
-            when (screen) {
-                AppNavScreen.CATALOGO -> CatalogScreen(viewModel = viewModel)
-                AppNavScreen.SIMULADOR -> SimulatorScreen(viewModel = viewModel)
-                AppNavScreen.COTIZADOR -> QuotationScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
-                AppNavScreen.PEDIDOS -> OrdersScreen(viewModel = viewModel)
-                AppNavScreen.ENTREGAS -> DeliveryScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
-                AppNavScreen.INVENTARIO -> InventoryScreen(viewModel = viewModel)
+                .testTag("screen_3d_fullscreen_root")
+        ) {
+            Book3DViewer(
+                modifier = Modifier.fillMaxSize(),
+                bindingType = simulatorBinding,
+                coverColor = Color(coverColorHex),
+                customTextureBitmap = customBitmap,
+                foilTitle = foilTitle,
+                foilSubtitle = foilSubtitle,
+                foilColorType = foilColor,
+                hasRibbon = hasRibbon,
+                hasCornerGuards = hasCorners,
+                showControls = true,
+                isFullScreen = true,
+                onCloseFullscreen = { viewModel.close3DFullscreen() },
+                onQuoteClick = {
+                    viewModel.close3DFullscreen()
+                    viewModel.navigateTo(AppNavScreen.COTIZADOR)
+                },
+                widthCm = bookWidthCm,
+                lengthCm = bookLengthCm,
+                spineThicknessMm = spineThicknessMm,
+                sheetCount = bookSheetCount,
+                grammageGsm = bookGrammageGsm
+            )
+        }
+    } else {
+        val pendingOrdersCount = orders.count { it.status == OrderStatus.EN_TALLER || it.status == OrderStatus.CONFIRMADO }
+        val readyToDeliverCount = orders.count { it.status == OrderStatus.TERMINADO }
+
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("main_app_scaffold"),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.MenuBook,
+                                        contentDescription = "Logo",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Encuadernación",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Binding Studio Offline",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
+                    actions = {
+                        // Quick indicator of active workshop jobs
+                        if (pendingOrdersCount > 0) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.padding(end = 12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "$pendingOrdersCount en taller",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            },
+            bottomBar = {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.testTag("main_navigation_bar")
+                ) {
+                    AppNavScreen.values().forEach { screen ->
+                        val isSelected = currentScreen == screen
+                        val icon = getScreenIcon(screen)
+
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { viewModel.navigateTo(screen) },
+                            icon = {
+                                when (screen) {
+                                    AppNavScreen.PEDIDOS -> {
+                                        if (pendingOrdersCount > 0) {
+                                            BadgedBox(
+                                                badge = {
+                                                    Badge(
+                                                        containerColor = MaterialTheme.colorScheme.primary,
+                                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                                    ) { Text("$pendingOrdersCount") }
+                                                }
+                                            ) {
+                                                Icon(icon, contentDescription = screen.title)
+                                            }
+                                        } else {
+                                            Icon(icon, contentDescription = screen.title)
+                                        }
+                                    }
+                                    AppNavScreen.ENTREGAS -> {
+                                        if (readyToDeliverCount > 0) {
+                                            BadgedBox(
+                                                badge = {
+                                                    Badge(
+                                                        containerColor = MaterialTheme.colorScheme.primary,
+                                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                                    ) { Text("$readyToDeliverCount") }
+                                                }
+                                            ) {
+                                                Icon(icon, contentDescription = screen.title)
+                                            }
+                                        } else {
+                                            Icon(icon, contentDescription = screen.title)
+                                        }
+                                    }
+                                    AppNavScreen.INVENTARIO -> {
+                                        if (lowStockMaterials.isNotEmpty()) {
+                                            BadgedBox(
+                                                badge = { Badge(containerColor = MaterialTheme.colorScheme.error) { Text("!") } }
+                                            ) {
+                                                Icon(icon, contentDescription = screen.title)
+                                            }
+                                        } else {
+                                            Icon(icon, contentDescription = screen.title)
+                                        }
+                                    }
+                                    else -> {
+                                        Icon(icon, contentDescription = screen.title)
+                                    }
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = when (screen) {
+                                        AppNavScreen.CATALOGO -> "Catálogo"
+                                        AppNavScreen.SIMULADOR -> "Simulador"
+                                        AppNavScreen.COTIZADOR -> "Cotizador"
+                                        AppNavScreen.PEDIDOS -> "Taller"
+                                        AppNavScreen.ENTREGAS -> "Entregas"
+                                        AppNavScreen.INVENTARIO -> "Stock"
+                                    },
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier.testTag("nav_item_${screen.name.lowercase()}")
+                        )
+                    }
+                }
+            }
+        ) { innerPadding ->
+            AnimatedContent(
+                targetState = currentScreen,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                label = "screen_transition"
+            ) { screen ->
+                when (screen) {
+                    AppNavScreen.CATALOGO -> CatalogScreen(viewModel = viewModel)
+                    AppNavScreen.SIMULADOR -> SimulatorScreen(viewModel = viewModel)
+                    AppNavScreen.COTIZADOR -> QuotationScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
+                    AppNavScreen.PEDIDOS -> OrdersScreen(viewModel = viewModel)
+                    AppNavScreen.ENTREGAS -> DeliveryScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
+                    AppNavScreen.INVENTARIO -> InventoryScreen(viewModel = viewModel)
+                }
             }
         }
     }

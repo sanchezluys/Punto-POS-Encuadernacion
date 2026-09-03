@@ -115,6 +115,10 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
         selectGlobalBinding(binding)
     }
 
+    fun selectBindingForSimulator(binding: BindingType) {
+        selectGlobalBinding(binding)
+    }
+
     fun setQuoteBinding(binding: BindingType) {
         selectGlobalBinding(binding)
     }
@@ -147,8 +151,41 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     private val _calculatedSpineThicknessMm = MutableStateFlow(16.0f)
     val calculatedSpineThicknessMm: StateFlow<Float> = _calculatedSpineThicknessMm.asStateFlow()
 
+    private val _sheetsPerSignature = MutableStateFlow(4)
+    val sheetsPerSignature: StateFlow<Int> = _sheetsPerSignature.asStateFlow()
+
     private val _estimatedSignatures = MutableStateFlow(15)
     val estimatedSignatures: StateFlow<Int> = _estimatedSignatures.asStateFlow()
+
+    // Persisted 3D Camera/Transform state across color, texture & dimension edits
+    private val _book3DYawDeg = MutableStateFlow(-25f)
+    val book3DYawDeg: StateFlow<Float> = _book3DYawDeg.asStateFlow()
+
+    private val _book3DPitchDeg = MutableStateFlow(15f)
+    val book3DPitchDeg: StateFlow<Float> = _book3DPitchDeg.asStateFlow()
+
+    private val _book3DZoomScale = MutableStateFlow(1.0f)
+    val book3DZoomScale: StateFlow<Float> = _book3DZoomScale.asStateFlow()
+
+    private val _book3DOpenAngleDeg = MutableStateFlow(0f)
+    val book3DOpenAngleDeg: StateFlow<Float> = _book3DOpenAngleDeg.asStateFlow()
+
+    fun update3DTransform(yaw: Float, pitch: Float, zoom: Float, openAngle: Float) {
+        _book3DYawDeg.value = yaw
+        _book3DPitchDeg.value = pitch
+        _book3DZoomScale.value = zoom
+        _book3DOpenAngleDeg.value = openAngle
+    }
+
+    fun updateBook3DTransform(yaw: Float, pitch: Float, zoom: Float, openAngle: Float) {
+        update3DTransform(yaw, pitch, zoom, openAngle)
+    }
+
+    fun setSheetsPerSignature(sheets: Int) {
+        val validSheets = sheets.coerceIn(1, 16)
+        _sheetsPerSignature.value = validSheets
+        recalculateDerivedSpecs()
+    }
 
     private fun recalculateDerivedSpecs() {
         val isHardcover = _simulatorBinding.value.spineType != SpineType.OPEN_SPINE &&
@@ -160,13 +197,7 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
         )
         _calculatedSpineThicknessMm.value = thickness.toFloat()
 
-        val gsm = _bookGrammageGsm.value
-        val sheetsPerSig = when {
-            gsm >= 300 -> 2
-            gsm >= 200 -> 2
-            gsm >= 160 -> 3
-            else -> 4
-        }
+        val sheetsPerSig = _sheetsPerSignature.value.coerceAtLeast(1)
         _estimatedSignatures.value = ceil(_bookSheetCount.value.toDouble() / sheetsPerSig).toInt()
     }
 
@@ -228,6 +259,7 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     fun setBookPaperOption(paper: PaperOption) {
         _bookPaperType.value = paper.name
         _bookGrammageGsm.value = paper.grammageGsm
+        _sheetsPerSignature.value = paper.sheetsPerSignature
         recalculateDerivedSpecs()
     }
 
@@ -240,6 +272,7 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
         val matched = PredefinedPapers.list.find { it.name == paperName }
         if (matched != null) {
             _bookGrammageGsm.value = matched.grammageGsm
+            _sheetsPerSignature.value = matched.sheetsPerSignature
         } else {
             val gsm = when {
                 paperName.contains("300g", ignoreCase = true) || paperName.contains("Acuarela", ignoreCase = true) -> 300
@@ -251,6 +284,12 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
                 else -> 90
             }
             _bookGrammageGsm.value = gsm
+            _sheetsPerSignature.value = when {
+                gsm >= 300 -> 2
+                gsm >= 200 -> 2
+                gsm >= 160 -> 3
+                else -> 4
+            }
         }
         recalculateDerivedSpecs()
     }
@@ -260,6 +299,14 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
         val matched = PredefinedPapers.list.find { it.grammageGsm == grammageGsm }
         if (matched != null) {
             _bookPaperType.value = matched.name
+            _sheetsPerSignature.value = matched.sheetsPerSignature
+        } else {
+            _sheetsPerSignature.value = when {
+                grammageGsm >= 300 -> 2
+                grammageGsm >= 200 -> 2
+                grammageGsm >= 160 -> 3
+                else -> 4
+            }
         }
         recalculateDerivedSpecs()
     }
@@ -335,6 +382,23 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
 
     fun setSimulatorCustomBitmap(bitmap: Bitmap?) {
         _simulatorCustomBitmap.value = bitmap
+    }
+
+    // ==========================================
+    // 3B. FULLSCREEN 3D SIMULATION STATE
+    // ==========================================
+    private val _is3DFullscreenActive = MutableStateFlow(false)
+    val is3DFullscreenActive: StateFlow<Boolean> = _is3DFullscreenActive.asStateFlow()
+
+    fun open3DFullscreen(binding: BindingType? = null) {
+        if (binding != null) {
+            selectGlobalBinding(binding, updateCoverDefaults = false)
+        }
+        _is3DFullscreenActive.value = true
+    }
+
+    fun close3DFullscreen() {
+        _is3DFullscreenActive.value = false
     }
 
     fun applyPresetTexture(preset: TexturePreset) {
@@ -569,8 +633,22 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateOrderStatus(order: OrderEntity, newStatus: OrderStatus) {
+        updateOrderStatusWithNote(order, newStatus, "")
+    }
+
+    fun updateOrderStatusWithNote(order: OrderEntity, newStatus: OrderStatus, note: String) {
         viewModelScope.launch {
-            val updated = order.copy(
+            val withLog = if (note.isNotBlank() || newStatus != order.status) {
+                order.withAddedStepLog(
+                    stepName = order.currentWorkshopStep.displayName,
+                    statusName = newStatus.displayName,
+                    note = note
+                )
+            } else {
+                order
+            }
+
+            val updated = withLog.copy(
                 status = newStatus,
                 deliveredAt = if (newStatus == OrderStatus.ENTREGADO) System.currentTimeMillis() else order.deliveredAt
             )
@@ -582,29 +660,52 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun advanceWorkshopStep(order: OrderEntity) {
+        advanceWorkshopStepWithNote(order, null, "")
+    }
+
+    fun advanceWorkshopStepWithNote(
+        order: OrderEntity,
+        newStep: WorkshopStep? = null,
+        note: String = "",
+        explicitStatus: OrderStatus? = null
+    ) {
         viewModelScope.launch {
             val steps = WorkshopStep.values()
-            val currentIndex = steps.indexOf(order.currentWorkshopStep)
-            val nextStep = if (currentIndex < steps.size - 1) {
-                steps[currentIndex + 1]
+            val targetStep = if (newStep != null) {
+                newStep
             } else {
-                steps.last()
+                val currentIndex = steps.indexOf(order.currentWorkshopStep)
+                if (currentIndex < steps.size - 1) steps[currentIndex + 1] else steps.last()
             }
 
-            val newStatus = if (nextStep == WorkshopStep.CONTROL_CALIDAD) {
-                OrderStatus.TERMINADO
-            } else {
-                OrderStatus.EN_TALLER
+            val targetStatus = explicitStatus ?: when {
+                targetStep == WorkshopStep.CONTROL_CALIDAD -> OrderStatus.TERMINADO
+                order.status == OrderStatus.COTIZACION || order.status == OrderStatus.CONFIRMADO -> OrderStatus.EN_TALLER
+                else -> order.status
             }
 
-            val updated = order.copy(
-                currentWorkshopStep = nextStep,
-                status = if (order.status == OrderStatus.COTIZACION || order.status == OrderStatus.CONFIRMADO) newStatus else order.status
+            val withLog = order.withAddedStepLog(
+                stepName = targetStep.displayName,
+                statusName = targetStatus.displayName,
+                note = note
             )
+
+            val updated = withLog.copy(
+                currentWorkshopStep = targetStep,
+                status = targetStatus
+            )
+
             repository.updateOrder(updated)
             if (_selectedOrderDetail.value?.id == order.id) {
                 _selectedOrderDetail.value = updated
             }
+        }
+    }
+
+    fun createDirectOrder(order: OrderEntity, onSaved: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val id = repository.confirmOrderAndDeductStock(order)
+            onSaved(id)
         }
     }
 
