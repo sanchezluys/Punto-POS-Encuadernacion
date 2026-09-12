@@ -1,21 +1,48 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ===========================================================================
+# Reglas de Ofuscación y Optimización R8 / ProGuard
+# ===========================================================================
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Optimización agresiva y modificación de accesos para mayor ratio de ofuscación
+-allowaccessmodification
+-repackageclasses ''
+-overloadaggressively
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Preservar atributos necesarios para Kotlin Coroutines, Compose y Room
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Preservar información de línea para stacktraces ofuscados
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Componentes Android del AndroidManifest
+-keep public class * extends android.app.Activity
+-keep public class * extends android.app.Application
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+-keep public class * extends androidx.core.content.FileProvider
+
+# ViewModels: mantener constructores para instanciación por ViewModelProvider
+-keepclassmembers class * extends androidx.lifecycle.ViewModel {
+    <init>(...);
+}
+
+# Room Database y Entidades
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao interface * { *; }
+-keepclassmembers class * {
+    @androidx.room.PrimaryKey *;
+    @androidx.room.ColumnInfo *;
+    @androidx.room.Embedded *;
+    @androidx.room.Relation *;
+}
+-dontwarn androidx.room.paging.**
+
+# Supresión de advertencias en librerías comunes
+-dontwarn kotlinx.coroutines.**
+-dontwarn coil.**
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+-dontwarn com.google.firebase.**
+

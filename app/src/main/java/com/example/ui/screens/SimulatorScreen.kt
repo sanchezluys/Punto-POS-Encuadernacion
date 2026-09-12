@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -77,9 +78,8 @@ import androidx.core.content.ContextCompat
 import com.example.data.model.QuoteCalculator
 import com.example.data.model.PredefinedBookFormats
 import com.example.data.model.PredefinedPapers
-import com.example.ui.components.Book2DDetailViewer
 import com.example.ui.components.Book3DFullscreenDialog
-import com.example.ui.components.Book3DViewer
+import com.example.ui.components.BookCover2DViewer
 import com.example.ui.components.BookProposalShareDialog
 import com.example.ui.theme.FoilGold
 import com.example.ui.theme.FoilSilver
@@ -116,57 +116,11 @@ fun SimulatorScreen(
     val bookFormatSize by viewModel.bookFormatSize.collectAsState()
     val spineThicknessMm by viewModel.calculatedSpineThicknessMm.collectAsState()
     val estimatedSignatures by viewModel.estimatedSignatures.collectAsState()
-    val sheetsPerSignature by viewModel.sheetsPerSignature.collectAsState()
-    val book3DYawDeg by viewModel.book3DYawDeg.collectAsState()
-    val book3DPitchDeg by viewModel.book3DPitchDeg.collectAsState()
-    val book3DZoomScale by viewModel.book3DZoomScale.collectAsState()
-    val book3DOpenAngleDeg by viewModel.book3DOpenAngleDeg.collectAsState()
-    val is3DFullscreenActive by viewModel.is3DFullscreenActive.collectAsState()
     val coverMaterial by viewModel.quoteCoverMaterial.collectAsState()
     val quoteResult = viewModel.getCalculatedQuote()
 
     var showShareDialog by remember { mutableStateOf(false) }
-    var showFullscreen3D by remember { mutableStateOf(false) }
-
-    // Fullscreen 3D Simulation Dialog
-    if (showFullscreen3D || is3DFullscreenActive) {
-        Book3DFullscreenDialog(
-            bindingType = simulatorBinding,
-            coverColor = Color(coverColorHex),
-            customTextureBitmap = customBitmap,
-            foilTitle = foilTitle,
-            foilSubtitle = foilSubtitle,
-            foilColorType = foilColor,
-            hasRibbon = hasRibbon,
-            hasCornerGuards = hasCorners,
-            widthCm = bookWidthCm,
-            lengthCm = bookLengthCm,
-            spineThicknessMm = spineThicknessMm,
-            sheetCount = bookSheetCount,
-            grammageGsm = bookGrammageGsm,
-            estimatedSignatures = estimatedSignatures,
-            sheetsPerSignature = sheetsPerSignature,
-            currentYaw = book3DYawDeg,
-            currentPitch = book3DPitchDeg,
-            currentZoom = book3DZoomScale,
-            currentOpenAngle = book3DOpenAngleDeg,
-            onTransformChanged = { yaw, pitch, zoom, openAngle ->
-                viewModel.update3DTransform(yaw, pitch, zoom, openAngle)
-            },
-            onColorSelected = { colorHex ->
-                viewModel.setSimulatorColor(colorHex)
-            },
-            onQuoteClick = {
-                showFullscreen3D = false
-                viewModel.close3DFullscreen()
-                viewModel.prepareQuotationFromSimulator()
-            },
-            onDismiss = {
-                showFullscreen3D = false
-                viewModel.close3DFullscreen()
-            }
-        )
-    }
+    var show3DFullscreen by remember { mutableStateOf(false) }
 
     val exportSpec = remember(
         simulatorBinding, bookWidthCm, bookLengthCm, spineThicknessMm,
@@ -251,58 +205,133 @@ fun SimulatorScreen(
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                 )
 
-                // 2D Technical Viewer (Detailed Covers & Spine) with Fullscreen 3D button
-                Book2DDetailViewer(
-                    bindingType = simulatorBinding,
-                    coverColor = Color(coverColorHex),
-                    customTextureBitmap = customBitmap,
-                    foilTitle = foilTitle,
-                    foilSubtitle = foilSubtitle,
-                    foilColorType = foilColor,
-                    hasRibbon = hasRibbon,
-                    hasCornerGuards = hasCorners,
-                    widthCm = bookWidthCm,
-                    lengthCm = bookLengthCm,
-                    spineThicknessMm = spineThicknessMm,
-                    sheetCount = bookSheetCount,
-                    grammageGsm = bookGrammageGsm,
-                    estimatedSignatures = estimatedSignatures,
-                    sheetsPerSignature = sheetsPerSignature,
-                    onOpen3DSimulation = { viewModel.open3DFullscreen() }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Quick Share & Quote Bar below 2D Viewer
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // 3D Canvas Viewer Card with Title & Texture Info
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("simulator_3d_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    Button(
-                        onClick = { showShareDialog = true },
-                        modifier = Modifier
-                            .weight(1.2f)
-                            .height(44.dp)
-                            .testTag("btn_share_3d_proposal_top"),
-                        colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Compartir Ficha 3D", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = simulatorBinding.name,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (customBitmap != null) "Textura personalizada aplicada • Vista 2D de tapas" else "Detalle de tapas y acabados • Vista 2D",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (customBitmap != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
-                    OutlinedButton(
-                        onClick = { viewModel.prepareQuotationFromSimulator() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .testTag("btn_quote_from_viewer_top"),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Cotizar", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer
+                            ) {
+                                Text(
+                                    text = simulatorBinding.spineType.name.replace("_", " "),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        BookCover2DViewer(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(350.dp)
+                                .testTag("simulator_2d_cover_viewer"),
+                            bindingType = simulatorBinding,
+                            coverColor = Color(coverColorHex),
+                            customTextureBitmap = customBitmap,
+                            foilTitle = foilTitle,
+                            foilSubtitle = foilSubtitle,
+                            foilColorType = foilColor,
+                            hasRibbon = hasRibbon,
+                            hasCornerGuards = hasCorners,
+                            widthCm = bookWidthCm,
+                            lengthCm = bookLengthCm,
+                            spineThicknessMm = spineThicknessMm,
+                            sheetCount = bookSheetCount,
+                            grammageGsm = bookGrammageGsm
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Botón para ver en 3D a pantalla completa (fuera de la vista 2D)
+                        Button(
+                            onClick = { show3DFullscreen = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("btn_view_3d_fullscreen_simulator"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ViewInAr,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Ver en 3D (Pantalla completa)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Quick Share & Quote Bar below 3D Viewer
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showShareDialog = true },
+                                modifier = Modifier
+                                    .weight(1.2f)
+                                    .height(44.dp)
+                                    .testTag("btn_share_3d_proposal_top"),
+                                colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Compartir Ficha 3D", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.prepareQuotationFromSimulator() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .testTag("btn_quote_from_viewer_top"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Cotizar", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+                        }
                     }
                 }
             }
@@ -525,54 +554,7 @@ fun SimulatorScreen(
                         steps = 34
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Hojas por Cuadernillo (Signature variation)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Hojas por Cuadernillo:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            Text("Varía el plegado y densidad de costura", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "$sheetsPerSignature hojas (${sheetsPerSignature * 4} págs)",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(2, 3, 4, 5, 6, 8, 10).forEach { count ->
-                            val isSelected = sheetsPerSignature == count
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.setSheetsPerSignature(count) },
-                                label = {
-                                    Text(
-                                        text = "${count}h",
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Calculation Summary Banner
                     Surface(
@@ -604,12 +586,12 @@ fun SimulatorScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "📚 Cuadernillos resultantes:",
+                                    text = "📚 Cuadernillos sugeridos:",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                                 Text(
-                                    text = "$estimatedSignatures cuadernillos ($sheetsPerSignature hojas c/u)",
+                                    text = "$estimatedSignatures cuadernillos (de 4 hojas c/u)",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -1079,6 +1061,25 @@ fun SimulatorScreen(
         BookProposalShareDialog(
             spec = exportSpec,
             onDismiss = { showShareDialog = false }
+        )
+    }
+
+    if (show3DFullscreen) {
+        Book3DFullscreenDialog(
+            bindingType = simulatorBinding,
+            coverColor = Color(coverColorHex),
+            customTextureBitmap = customBitmap,
+            foilTitle = foilTitle,
+            foilSubtitle = foilSubtitle,
+            foilColorType = foilColor,
+            hasRibbon = hasRibbon,
+            hasCornerGuards = hasCorners,
+            widthCm = bookWidthCm,
+            lengthCm = bookLengthCm,
+            spineThicknessMm = spineThicknessMm,
+            sheetCount = bookSheetCount,
+            grammageGsm = bookGrammageGsm,
+            onDismiss = { show3DFullscreen = false }
         )
     }
 }

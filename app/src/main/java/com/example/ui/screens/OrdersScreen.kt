@@ -24,17 +24,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Handyman
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
@@ -72,14 +68,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.OrderEntity
 import com.example.data.model.OrderStatus
 import com.example.data.model.WorkshopStep
-import com.example.ui.components.AdvanceStepDialog
-import com.example.ui.components.NewOrderDialog
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.GoldenOchre
 import com.example.ui.theme.LeatherDark
@@ -102,38 +95,11 @@ fun OrdersScreen(
     val selectedOrder by viewModel.selectedOrderDetail.collectAsState()
 
     var orderToDelete by remember { mutableStateOf<OrderEntity?>(null) }
-    var showNewOrderDialog by remember { mutableStateOf(false) }
-    var orderToAdvanceStep by remember { mutableStateOf<OrderEntity?>(null) }
 
     val filteredOrders = if (statusFilter == null) {
         orders
     } else {
         orders.filter { it.status == statusFilter }
-    }
-
-    // New Order Dialog with Phone Contacts Integration
-    if (showNewOrderDialog) {
-        NewOrderDialog(
-            bindingTypes = viewModel.bindingTypes,
-            initialBinding = viewModel.selectedCatalogBinding.value,
-            onDismiss = { showNewOrderDialog = false },
-            onSaveOrder = { newOrder ->
-                viewModel.createDirectOrder(newOrder)
-                showNewOrderDialog = false
-            }
-        )
-    }
-
-    // Advance Workshop Step Dialog with Optional Note
-    orderToAdvanceStep?.let { order ->
-        AdvanceStepDialog(
-            order = order,
-            onDismiss = { orderToAdvanceStep = null },
-            onConfirmStepChange = { nextStep, note, nextStatus ->
-                viewModel.advanceWorkshopStepWithNote(order, nextStep, note, nextStatus)
-                orderToAdvanceStep = null
-            }
-        )
     }
 
     LazyColumn(
@@ -143,41 +109,21 @@ fun OrdersScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 90.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Header with "Ingresar Pedido" Action Button
+        // Header
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Gestión de Pedidos & Taller",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "Seguimiento de etapas de producción artesanal, presupuestos y entregas.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Button(
-                    onClick = { showNewOrderDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    modifier = Modifier.testTag("btn_add_new_order")
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Ingresar Pedido", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
+            Column {
+                Text(
+                    text = "Gestión de Pedidos & Taller",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Seguimiento de etapas de producción artesanal, presupuestos y entregas.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
 
@@ -261,26 +207,20 @@ fun OrdersScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Ingresa un pedido conectando tus contactos o cotiza desde el simulador.",
+                            text = "Crea un nuevo presupuesto desde el Cotizador.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(
-                                onClick = { showNewOrderDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ingresar Pedido")
-                            }
-                            OutlinedButton(
-                                onClick = { viewModel.navigateTo(AppNavScreen.COTIZADOR) }
-                            ) {
-                                Text("Ir a Cotizador")
-                            }
+                        Button(
+                            onClick = { viewModel.navigateTo(AppNavScreen.COTIZADOR) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Text("Ir al Cotizador")
                         }
                     }
                 }
@@ -292,7 +232,7 @@ fun OrdersScreen(
             OrderCard(
                 order = order,
                 onSelect = { viewModel.selectOrderForDetail(order) },
-                onAdvanceStep = { orderToAdvanceStep = order },
+                onAdvanceStep = { viewModel.advanceWorkshopStep(order) },
                 onDeliver = { viewModel.selectOrderForDelivery(order) },
                 onDelete = { orderToDelete = order }
             )
@@ -308,7 +248,6 @@ fun OrdersScreen(
             OrderDetailSheetContent(
                 order = order,
                 viewModel = viewModel,
-                onOpenAdvanceStepDialog = { orderToAdvanceStep = order },
                 onDismiss = { viewModel.selectOrderForDetail(null) }
             )
         }
@@ -349,8 +288,6 @@ fun OrderCard(
     onDelete: () -> Unit
 ) {
     val df = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val stepLogs = remember(order.stepNotesJson) { order.getStepLogs() }
-    val latestLogWithNote = remember(stepLogs) { stepLogs.lastOrNull { it.note.isNotBlank() } }
 
     ElevatedCard(
         modifier = Modifier
@@ -451,24 +388,23 @@ fun OrderCard(
                         Icon(Icons.Default.Handyman, contentDescription = null, tint = GoldenOchre, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Etapa ${stepIndex + 1}/8: ${order.currentWorkshopStep.displayName}",
+                            text = "Taller: ${order.currentWorkshopStep.displayName}",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
                             color = SaddleBrown
                         )
                     }
                     Text(
-                        text = "${(progress * 100).toInt()}%",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        text = "Paso ${stepIndex + 1}/${allSteps.size}",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(top = 4.dp)
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
                     color = GoldenOchre,
@@ -476,42 +412,9 @@ fun OrderCard(
                 )
             }
 
-            // Show latest artisan workshop note if present
-            if (latestLogWithNote != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = GoldenOchre.copy(alpha = 0.12f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EditNote,
-                            contentDescription = null,
-                            tint = SaddleBrown,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "${latestLogWithNote.stepName}: \"${latestLogWithNote.note}\"",
-                            fontSize = 11.sp,
-                            color = SaddleBrown,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Pricing & Actions Row
+            // Bottom row: Pricing & Quick Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -519,23 +422,23 @@ fun OrderCard(
             ) {
                 Column {
                     Text(
-                        text = "Total: $${String.format(Locale.US, "%.2f", order.totalAmount)}",
+                        text = "Total: $${String.format(java.util.Locale.US, "%.2f", order.totalAmount)}",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontSize = 15.sp,
+                        color = SaddleBrown
                     )
-                    if (order.depositPaid > 0) {
+                    if (order.balanceDue > 0 && order.status != OrderStatus.ENTREGADO) {
                         Text(
-                            text = "Seña: $${String.format(Locale.US, "%.2f", order.depositPaid)}",
+                            text = "Saldo pendiente: $${String.format(java.util.Locale.US, "%.2f", order.balanceDue)}",
                             fontSize = 11.sp,
-                            color = ForestGreen,
+                            color = Terracotta,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Advance step button with note
+                    // Advance step button
                     if (order.status == OrderStatus.CONFIRMADO || order.status == OrderStatus.EN_TALLER) {
                         OutlinedButton(
                             onClick = onAdvanceStep,
@@ -543,9 +446,7 @@ fun OrderCard(
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                             modifier = Modifier.height(34.dp)
                         ) {
-                            Icon(Icons.Default.EditNote, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Avanzar / Nota", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Avanzar Paso →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -563,18 +464,6 @@ fun OrderCard(
                             Text("Entregar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Eliminar",
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
                 }
             }
         }
@@ -586,11 +475,9 @@ fun OrderCard(
 fun OrderDetailSheetContent(
     order: OrderEntity,
     viewModel: BookbindingViewModel,
-    onOpenAdvanceStepDialog: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val df = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    val stepLogs = remember(order.stepNotesJson) { order.getStepLogs() }
 
     LazyColumn(
         modifier = Modifier
@@ -642,29 +529,11 @@ fun OrderDetailSheetContent(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Proceso de Fabricación Artesanal",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Surface(
-                            color = GoldenOchre.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = "8 Pasos",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = SaddleBrown,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
+                    Text(
+                        text = "Proceso de Fabricación Artesanal",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
 
                     val allSteps = WorkshopStep.values()
@@ -719,108 +588,15 @@ fun OrderDetailSheetContent(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Button(
-                        onClick = onOpenAdvanceStepDialog,
+                        onClick = { viewModel.advanceWorkshopStep(order) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = SaddleBrown),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(Icons.Default.EditNote, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Avanzar Paso / Registrar Nota de Taller")
-                    }
-                }
-            }
-        }
-
-        // Workshop Step Notes & History Timeline (Requested by user)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Historial de Notas del Taller", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                        }
-                        Text(
-                            text = "${stepLogs.size} registro(s)",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    if (stepLogs.isEmpty()) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "No se han registrado notas aún. Cada vez que avances una etapa en el taller podrás agregar una nota de control de calidad o detalle artesanal.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(12.dp),
-                                lineHeight = 16.sp
-                            )
-                        }
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            stepLogs.reversed().forEach { log ->
-                                val logDateStr = try {
-                                    df.format(Date(log.timestamp))
-                                } catch (e: Exception) {
-                                    ""
-                                }
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = log.stepName,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp,
-                                                color = SaddleBrown
-                                            )
-                                            Text(
-                                                text = logDateStr,
-                                                fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-
-                                        if (log.note.isNotBlank()) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = "📝 ${log.note}",
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                fontWeight = FontWeight.Normal
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        Text("Avanzar a Siguiente Etapa")
                     }
                 }
             }
@@ -852,33 +628,12 @@ fun OrderDetailSheetContent(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Datos del Cliente", fontWeight = FontWeight.Bold)
-                        if (order.customerPhone.isNotBlank()) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.ContactPhone, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Agenda", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
+                    Text("Datos del Cliente & Entrega", fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Cliente: ${order.customerName}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Cliente: ${order.customerName}", fontSize = 13.sp)
                     if (order.customerPhone.isNotBlank()) Text("Teléfono: ${order.customerPhone}", fontSize = 13.sp)
                     if (order.customerEmail.isNotBlank()) Text("Email: ${order.customerEmail}", fontSize = 13.sp)
-                    if (order.customerNotes.isNotBlank()) Text("Notas iniciales: ${order.customerNotes}", fontSize = 13.sp, color = Terracotta)
+                    if (order.customerNotes.isNotBlank()) Text("Notas: ${order.customerNotes}", fontSize = 13.sp, color = Terracotta)
                 }
             }
         }

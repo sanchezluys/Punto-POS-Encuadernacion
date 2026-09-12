@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,11 +16,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ViewInAr
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,10 +38,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.BindingType
-import com.example.ui.theme.GoldenOchre
-import com.example.ui.theme.LeatherDark
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Diálogo a pantalla completa para explorar el libro en 3D interactivo 360°
+ */
 @Composable
 fun Book3DFullscreenDialog(
     bindingType: BindingType,
@@ -50,22 +50,14 @@ fun Book3DFullscreenDialog(
     foilTitle: String = "",
     foilSubtitle: String = "",
     foilColorType: String = "Dorado",
-    hasRibbon: Boolean = true,
-    hasCornerGuards: Boolean = true,
+    hasRibbon: Boolean = bindingType.hasRibbon,
+    hasCornerGuards: Boolean = bindingType.hasCornerGuards,
+    ribbonColor: Color = Color(0xFFC41E3A),
     widthCm: Float = 14.8f,
     lengthCm: Float = 21.0f,
-    spineThicknessMm: Float = 14.0f,
-    sheetCount: Int = 80,
+    spineThicknessMm: Float = 16.0f,
+    sheetCount: Int = 60,
     grammageGsm: Int = 90,
-    estimatedSignatures: Int = 15,
-    sheetsPerSignature: Int = 4,
-    currentYaw: Float? = null,
-    currentPitch: Float? = null,
-    currentZoom: Float? = null,
-    currentOpenAngle: Float? = null,
-    onTransformChanged: ((yaw: Float, pitch: Float, zoom: Float, openAngle: Float) -> Unit)? = null,
-    onColorSelected: ((Long) -> Unit)? = null,
-    onQuoteClick: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -76,39 +68,129 @@ fun Book3DFullscreenDialog(
             dismissOnClickOutside = false
         )
     ) {
-        Box(
+        Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .testTag("dialog_3d_fullscreen")
+                .testTag("dialog_3d_fullscreen"),
+            color = MaterialTheme.colorScheme.surface
         ) {
-            Book3DViewer(
-                modifier = Modifier.fillMaxSize(),
-                bindingType = bindingType,
-                coverColor = coverColor,
-                customTextureBitmap = customTextureBitmap,
-                foilTitle = foilTitle,
-                foilSubtitle = foilSubtitle,
-                foilColorType = foilColorType,
-                hasRibbon = hasRibbon,
-                hasCornerGuards = hasCornerGuards,
-                showControls = true,
-                isFullScreen = true,
-                onCloseFullscreen = onDismiss,
-                onQuoteClick = onQuoteClick,
-                widthCm = widthCm,
-                lengthCm = lengthCm,
-                spineThicknessMm = spineThicknessMm,
-                sheetCount = sheetCount,
-                grammageGsm = grammageGsm,
-                estimatedSignatures = estimatedSignatures,
-                sheetsPerSignature = sheetsPerSignature,
-                currentYaw = currentYaw,
-                currentPitch = currentPitch,
-                currentZoom = currentZoom,
-                currentOpenAngle = currentOpenAngle,
-                onTransformChanged = onTransformChanged,
-                onColorSelected = onColorSelected
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                // 3D Canvas filling viewport
+                Book3DViewer(
+                    modifier = Modifier.fillMaxSize().testTag("fullscreen_3d_viewer"),
+                    bindingType = bindingType,
+                    coverColor = coverColor,
+                    customTextureBitmap = customTextureBitmap,
+                    foilTitle = foilTitle,
+                    foilSubtitle = foilSubtitle,
+                    foilColorType = foilColorType,
+                    hasRibbon = hasRibbon,
+                    hasCornerGuards = hasCornerGuards,
+                    ribbonColor = ribbonColor,
+                    showControls = true,
+                    widthCm = widthCm,
+                    lengthCm = lengthCm,
+                    spineThicknessMm = spineThicknessMm,
+                    sheetCount = sheetCount,
+                    grammageGsm = grammageGsm
+                )
+
+                // Header Overlay with Exit and Model Info
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .align(Alignment.TopCenter),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    tonalElevation = 6.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.ViewInAr,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = bindingType.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "3D Pantalla Completa • ${widthCm}×${lengthCm} cm (Lomo ${String.format("%.1f", spineThicknessMm)} mm)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        FilledTonalButton(
+                            onClick = onDismiss,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("btn_close_3d_fullscreen")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FullscreenExit,
+                                contentDescription = "Volver a 2D",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Volver a 2D", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                // Floating Guidance Pill at bottom center
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 90.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.Black.copy(alpha = 0.75f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Arrastra para rotar 360° • Pellizca para zoom • Desliza apertura abajo",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
         }
     }
 }
