@@ -19,6 +19,8 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.example.data.model.BindingType
+import com.example.data.model.CurrencyFormatter
+import com.example.data.model.CurrencySettings
 import com.example.data.model.QuoteResult
 import com.example.data.model.SpineType
 import java.io.File
@@ -48,7 +50,8 @@ data class ProposalExportSpec(
     val clientName: String,
     val clientNotes: String,
     val quoteResult: QuoteResult,
-    val estimatedDays: Int = 4
+    val estimatedDays: Int = 4,
+    val currencySettings: CurrencySettings = CurrencySettings()
 )
 
 object BookProposalImageGenerator {
@@ -275,10 +278,10 @@ object BookProposalImageGenerator {
         }
         canvas.drawText("• Cantidad: ${spec.quoteResult.quantity} pieza(s) artesanal(es)", leftX, priceY, priceSubPaint)
         priceY += 30f
-        canvas.drawText("• Valor Unitario: $${String.format(Locale.US, "%.2f", spec.quoteResult.unitPrice)}", leftX, priceY, priceSubPaint)
+        canvas.drawText("• Valor Unitario: ${CurrencyFormatter.format(spec.quoteResult.unitPrice, spec.currencySettings)}", leftX, priceY, priceSubPaint)
         priceY += 30f
         val discountText = if (spec.quoteResult.totalDiscountAmount > 0) {
-            "• Descuento aplicado: -$${String.format(Locale.US, "%.2f", spec.quoteResult.totalDiscountAmount)}"
+            "• Descuento aplicado: -${CurrencyFormatter.format(spec.quoteResult.totalDiscountAmount, spec.currencySettings)}"
         } else {
             "• Tiempo estimado de taller: ${spec.estimatedDays} a 6 días hábiles"
         }
@@ -307,7 +310,7 @@ object BookProposalImageGenerator {
             textAlign = Paint.Align.CENTER
             setShadowLayer(10f, 0f, 4f, Color.argb(160, 0, 0, 0))
         }
-        canvas.drawText("$${String.format(Locale.US, "%.2f", spec.quoteResult.total)}", rightCenterX, priceCardRect.top + 115f, totalValuePaint)
+        canvas.drawText(CurrencyFormatter.format(spec.quoteResult.total, spec.currencySettings), rightCenterX, priceCardRect.top + 115f, totalValuePaint)
 
         // Deposit tag
         val depositRect = RectF(rightCenterX - 180f, priceCardRect.top + 140f, rightCenterX + 180f, priceCardRect.top + 185f)
@@ -323,7 +326,7 @@ object BookProposalImageGenerator {
             textAlign = Paint.Align.CENTER
         }
         val deposit50 = spec.quoteResult.total * 0.50
-        canvas.drawText("Anticipo Sugerido (50%): $${String.format(Locale.US, "%.2f", deposit50)}", rightCenterX, depositRect.centerY() + 6f, depositTextPaint)
+        canvas.drawText("Anticipo Sugerido (50%): ${CurrencyFormatter.format(deposit50, spec.currencySettings)}", rightCenterX, depositRect.centerY() + 6f, depositTextPaint)
 
         // 6. FOOTER: CRAFTSMANSHIP GUARANTEE & CALL TO ACTION
         curY = priceCardRect.bottom + 35f
@@ -719,8 +722,8 @@ object BookProposalImageGenerator {
             append("• *Cubiertas:* ${spec.coverMaterial} con grabado Hot Stamping ${spec.foilColorType}\n")
             if (spec.foilTitle.isNotBlank()) append("• *Título personalizado:* \"${spec.foilTitle}\"\n")
             append("• *Cantidad:* ${spec.quoteResult.quantity} unidad(es)\n")
-            append("• *Presupuesto Total:* $${String.format(Locale.US, "%.2f", spec.quoteResult.total)}\n")
-            append("• *Anticipo 50%:* $${String.format(Locale.US, "%.2f", spec.quoteResult.total * 0.5)}\n")
+            append("• *Presupuesto Total:* ${CurrencyFormatter.format(spec.quoteResult.total, spec.currencySettings)}\n")
+            append("• *Anticipo 50%:* ${CurrencyFormatter.format(spec.quoteResult.total * 0.5, spec.currencySettings)}\n")
             append("• *Tiempo estimado:* ${spec.estimatedDays} a 6 días hábiles de confección a mano.\n\n")
             append("✨ _Se adjunta ficha técnica y modelo 3D renderizado para su evaluación._")
         }

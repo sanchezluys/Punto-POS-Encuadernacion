@@ -156,7 +156,7 @@ fun InventoryScreen(
                     )
                     MetricBox(
                         title = "Valor Stock",
-                        value = "$${String.format(java.util.Locale.US, "%.0f", totalValuation)}",
+                        value = viewModel.formatPrice(totalValuation),
                         subtitle = "costo de reposición",
                         modifier = Modifier.weight(1f),
                         badgeColor = GoldenOchre
@@ -218,6 +218,7 @@ fun InventoryScreen(
             items(filteredMaterials, key = { it.id }) { item ->
                 MaterialCard(
                     material = item,
+                    formatPrice = { viewModel.formatPrice(it) },
                     onAdjustStock = { delta -> viewModel.adjustMaterialStock(item.id, delta) },
                     onEdit = { materialToEdit = item },
                     onDelete = { materialToDelete = item }
@@ -294,6 +295,7 @@ fun MetricBox(
 @Composable
 fun MaterialCard(
     material: MaterialItem,
+    formatPrice: (Double) -> String,
     onAdjustStock: (Double) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -323,7 +325,7 @@ fun MaterialCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${material.category.displayName} • Costo: $${String.format(java.util.Locale.US, "%.2f", material.unitCost)} / ${material.unit}",
+                        text = "${material.category.displayName} • Costo: ${formatPrice(material.unitCost)} / ${material.unit}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
                     )

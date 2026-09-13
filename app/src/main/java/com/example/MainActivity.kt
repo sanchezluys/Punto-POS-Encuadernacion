@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Inventory2
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -72,6 +75,7 @@ import com.example.ui.screens.DeliveryScreen
 import com.example.ui.screens.InventoryScreen
 import com.example.ui.screens.OrdersScreen
 import com.example.ui.screens.QuotationScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SimulatorScreen
 import com.example.ui.theme.ArtisanTheme
 import com.example.ui.theme.GoldenOchre
@@ -150,12 +154,56 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
                     containerColor = MaterialTheme.colorScheme.background
                 ),
                 actions = {
+                    val currencySettings by viewModel.currencySettings.collectAsState()
+
+                    // Quick currency badge button that opens settings
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { viewModel.navigateTo(AppNavScreen.AJUSTES) }
+                            .testTag("btn_top_currency_badge")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "${currencySettings.currency.flagEmoji} ${currencySettings.currency.code}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // Settings gear icon button
+                    IconButton(
+                        onClick = {
+                            if (currentScreen == AppNavScreen.AJUSTES) {
+                                viewModel.navigateBack()
+                            } else {
+                                viewModel.navigateTo(AppNavScreen.AJUSTES)
+                            }
+                        },
+                        modifier = Modifier.testTag("btn_top_settings")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Ajustes de Moneda y Formato",
+                            tint = if (currentScreen == AppNavScreen.AJUSTES) SaddleBrown else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
                     // Quick indicator of active workshop jobs
                     if (pendingOrdersCount > 0) {
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(end = 12.dp)
+                            modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -169,7 +217,7 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "$pendingOrdersCount en taller",
+                                    text = "$pendingOrdersCount",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -186,7 +234,7 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
                 tonalElevation = 0.dp,
                 modifier = Modifier.testTag("main_navigation_bar")
             ) {
-                AppNavScreen.values().forEach { screen ->
+                AppNavScreen.values().filter { it != AppNavScreen.AJUSTES }.forEach { screen ->
                     val isSelected = currentScreen == screen
                     val icon = getScreenIcon(screen)
 
@@ -252,6 +300,7 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
                                     AppNavScreen.PEDIDOS -> "Taller"
                                     AppNavScreen.ENTREGAS -> "Entregas"
                                     AppNavScreen.INVENTARIO -> "Stock"
+                                    AppNavScreen.AJUSTES -> "Ajustes"
                                 },
                                 fontSize = 10.sp,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
@@ -285,6 +334,11 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
                 AppNavScreen.PEDIDOS -> OrdersScreen(viewModel = viewModel)
                 AppNavScreen.ENTREGAS -> DeliveryScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
                 AppNavScreen.INVENTARIO -> InventoryScreen(viewModel = viewModel)
+                AppNavScreen.AJUSTES -> SettingsScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { viewModel.navigateBack() },
+                    snackbarHostState = snackbarHostState
+                )
             }
         }
     }
@@ -298,5 +352,6 @@ fun getScreenIcon(screen: AppNavScreen): ImageVector {
         AppNavScreen.PEDIDOS -> Icons.Default.Inventory2
         AppNavScreen.ENTREGAS -> Icons.Default.LocalShipping
         AppNavScreen.INVENTARIO -> Icons.Default.Warehouse
+        AppNavScreen.AJUSTES -> Icons.Default.Settings
     }
 }

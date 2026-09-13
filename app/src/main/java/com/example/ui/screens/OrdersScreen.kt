@@ -231,6 +231,7 @@ fun OrdersScreen(
         items(filteredOrders, key = { it.id }) { order ->
             OrderCard(
                 order = order,
+                formatPrice = { viewModel.formatPrice(it) },
                 onSelect = { viewModel.selectOrderForDetail(order) },
                 onAdvanceStep = { viewModel.advanceWorkshopStep(order) },
                 onDeliver = { viewModel.selectOrderForDelivery(order) },
@@ -282,6 +283,7 @@ fun OrdersScreen(
 @Composable
 fun OrderCard(
     order: OrderEntity,
+    formatPrice: (Double) -> String,
     onSelect: () -> Unit,
     onAdvanceStep: () -> Unit,
     onDeliver: () -> Unit,
@@ -422,14 +424,14 @@ fun OrderCard(
             ) {
                 Column {
                     Text(
-                        text = "Total: $${String.format(java.util.Locale.US, "%.2f", order.totalAmount)}",
+                        text = "Total: ${formatPrice(order.totalAmount)}",
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = SaddleBrown
                     )
                     if (order.balanceDue > 0 && order.status != OrderStatus.ENTREGADO) {
                         Text(
-                            text = "Saldo pendiente: $${String.format(java.util.Locale.US, "%.2f", order.balanceDue)}",
+                            text = "Saldo pendiente: ${formatPrice(order.balanceDue)}",
                             fontSize = 11.sp,
                             color = Terracotta,
                             fontWeight = FontWeight.SemiBold

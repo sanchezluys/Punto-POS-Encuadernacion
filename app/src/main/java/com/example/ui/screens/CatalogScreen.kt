@@ -22,12 +22,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DesignServices
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
@@ -38,6 +41,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -45,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -83,6 +88,7 @@ fun CatalogScreen(
     val formatSize by viewModel.bookFormatSize.collectAsState()
 
     var show3DFullscreen by remember { mutableStateOf(false) }
+    var zoomScale2D by remember { mutableFloatStateOf(1.0f) }
 
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     val categories = remember(allBindingTypes) {
@@ -179,7 +185,7 @@ fun CatalogScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // 2D Cover Viewer Box
+                        // 2D Cover Viewer Box (Limpio, sin botones ni textos superpuestos dentro)
                         BookCover2DViewer(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -191,35 +197,99 @@ fun CatalogScreen(
                             lengthCm = lengthCm,
                             spineThicknessMm = spineThicknessMm,
                             sheetCount = sheetCount,
-                            grammageGsm = grammageGsm
+                            grammageGsm = grammageGsm,
+                            zoomScale = zoomScale2D,
+                            onZoomChange = { zoomScale2D = it }
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Botón 3D a pantalla completa fuera de la vista 2D
-                        Button(
-                            onClick = { show3DFullscreen = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp)
-                                .testTag("btn_view_3d_fullscreen_catalog"),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White
-                            )
+                        // Controles externos (fuera de la vista 2D): Zoom (acercar/alejar) y botón 3D
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ViewInAr,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Ver en 3D (Pantalla completa)",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
+                            // Controles para acercar y alejar la vista 2D (fuera de la vista 2D)
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = { zoomScale2D = (zoomScale2D - 0.35f).coerceIn(0.7f, 4.0f) },
+                                        modifier = Modifier.size(36.dp).testTag("btn_zoom_out_2d_catalog")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Remove,
+                                            contentDescription = "Alejar vista 2D",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "${(zoomScale2D * 100).toInt()}%",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .clickable { zoomScale2D = 1.0f }
+                                            .padding(horizontal = 4.dp)
+                                    )
+                                    IconButton(
+                                        onClick = { zoomScale2D = (zoomScale2D + 0.35f).coerceIn(0.7f, 4.0f) },
+                                        modifier = Modifier.size(36.dp).testTag("btn_zoom_in_2d_catalog")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Acercar vista 2D",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    if (zoomScale2D > 1.05f || zoomScale2D < 0.95f) {
+                                        IconButton(
+                                            onClick = { zoomScale2D = 1.0f },
+                                            modifier = Modifier.size(36.dp).testTag("btn_zoom_reset_2d_catalog")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.RestartAlt,
+                                                contentDescription = "Restablecer zoom",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Botón 3D (fuera de la vista 2D)
+                            Button(
+                                onClick = { show3DFullscreen = true },
+                                modifier = Modifier
+                                    .height(44.dp)
+                                    .testTag("btn_view_3d_fullscreen_catalog"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SaddleBrown,
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ViewInAr,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Ver en 3D",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -361,7 +431,7 @@ fun CatalogScreen(
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                text = "Desde $${String.format(java.util.Locale.US, "%.2f", binding.basePrice)}",
+                                text = "Desde ${viewModel.formatPrice(binding.basePrice)}",
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,

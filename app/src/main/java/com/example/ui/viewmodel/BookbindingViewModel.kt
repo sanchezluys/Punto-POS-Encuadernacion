@@ -9,8 +9,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.data.db.AppDatabase
+import com.example.data.model.AppCurrency
 import com.example.data.model.BindingType
 import com.example.data.model.BookFormatOption
+import com.example.data.model.CurrencyFormatter
+import com.example.data.model.CurrencySettings
 import com.example.data.model.MaterialCategory
 import com.example.data.model.MaterialItem
 import com.example.data.model.OrderEntity
@@ -43,7 +46,8 @@ enum class AppNavScreen(val title: String, val iconName: String) {
     COTIZADOR("Cotizador", "Calculate"),
     PEDIDOS("Taller / Pedidos", "Inventory2"),
     ENTREGAS("Entregas", "LocalShipping"),
-    INVENTARIO("Inventario", "Warehouse")
+    INVENTARIO("Inventario", "Warehouse"),
+    AJUSTES("Ajustes", "Settings")
 }
 
 data class TexturePreset(
@@ -57,6 +61,85 @@ data class TexturePreset(
 class BookbindingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: BookbindingRepository
+    private val prefs = application.getSharedPreferences("artisan_binding_settings", android.content.Context.MODE_PRIVATE)
+
+    // =========================================================================
+    // 0. SETTINGS: CURRENCY & NUMERIC FORMAT (COP, USD, SOL, MILES, DECIMALES)
+    // =========================================================================
+    private val _currencySettings = MutableStateFlow(loadInitialCurrencySettings())
+    val currencySettings: StateFlow<CurrencySettings> = _currencySettings.asStateFlow()
+
+    private fun loadInitialCurrencySettings(): CurrencySettings {
+        val code = prefs.getString("pref_currency_code", AppCurrency.USD.code) ?: AppCurrency.USD.code
+        val currency = AppCurrency.fromCode(code)
+        val useThousands = prefs.getBoolean("pref_use_thousands_separator", true)
+        val useDecimals = prefs.getBoolean("pref_use_decimals", true)
+        val applyConversion = prefs.getBoolean("pref_apply_conversion_rate", false)
+        val customRate = prefs.getFloat("pref_custom_exchange_rate", currency.defaultConversionRate.toFloat()).toDouble()
+        return CurrencySettings(
+            currency = currency,
+            useThousandsSeparator = useThousands,
+            useDecimals = useDecimals,
+            applyConversionRate = applyConversion,
+            customExchangeRate = customRate
+        )
+    }
+
+    private fun persistCurrencySettings(settings: CurrencySettings) {
+        prefs.edit()
+            .putString("pref_currency_code", settings.currency.code)
+            .putBoolean("pref_use_thousands_separator", settings.useThousandsSeparator)
+            .putBoolean("pref_use_decimals", settings.useDecimals)
+            .putBoolean("pref_apply_conversion_rate", settings.applyConversionRate)
+            .putFloat("pref_custom_exchange_rate", settings.customExchangeRate.toFloat())
+            .apply()
+    }
+
+    fun updateCurrency(currency: AppCurrency) {
+        val updated = _currencySettings.value.copy(
+            currency = currency,
+            customExchangeRate = currency.defaultConversionRate
+        )
+        _currencySettings.value = updated
+        persistCurrencySettings(updated)
+    }
+
+    fun setUseThousandsSeparator(enabled: Boolean) {
+        val updated = _currencySettings.value.copy(useThousandsSeparator = enabled)
+        _currencySettings.value = updated
+        persistCurrencySettings(updated)
+    }
+
+    fun setUseDecimals(enabled: Boolean) {
+        val updated = _currencySettings.value.copy(useDecimals = enabled)
+        _currencySettings.value = updated
+        persistCurrencySettings(updated)
+    }
+
+    fun setApplyConversionRate(enabled: Boolean) {
+        val updated = _currencySettings.value.copy(applyConversionRate = enabled)
+        _currencySettings.value = updated
+        persistCurrencySettings(updated)
+    }
+
+    fun setCustomExchangeRate(rate: Double) {
+        val updated = _currencySettings.value.copy(customExchangeRate = rate)
+        _currencySettings.value = updated
+        persistCurrencySettings(updated)
+    }
+
+    fun resetCurrencySettings() {
+        val defaultSettings = CurrencySettings()
+        _currencySettings.value = defaultSettings
+        persistCurrencySettings(defaultSettings)
+    }
+
+    /**
+     * Formats price according to current active settings (COP, USD, SOL, miles, decimales)
+     */
+    fun formatPrice(amount: Double, includeCode: Boolean = true): String {
+        return CurrencyFormatter.format(amount, _currencySettings.value, includeCode)
+    }
 
     init {
         val database = AppDatabase.getDatabase(application, viewModelScope)
@@ -70,9 +153,17 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     // Navigation
     private val _currentScreen = MutableStateFlow(AppNavScreen.CATALOGO)
     val currentScreen: StateFlow<AppNavScreen> = _currentScreen.asStateFlow()
+    private var previousScreen: AppNavScreen = AppNavScreen.CATALOGO
 
     fun navigateTo(screen: AppNavScreen) {
+        if (_currentScreen.value != screen && _currentScreen.value != AppNavScreen.AJUSTES) {
+            previousScreen = _currentScreen.value
+        }
         _currentScreen.value = screen
+    }
+
+    fun navigateBack() {
+        _currentScreen.value = previousScreen
     }
 
     // =========================================================================

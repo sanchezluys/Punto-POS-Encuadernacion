@@ -170,7 +170,7 @@ fun DeliveryScreen(
                                                 fontSize = 14.sp
                                             )
                                             Text(
-                                                text = "${ord.quantity}x ${ord.bindingTypeName} • $${String.format(java.util.Locale.US, "%.2f", ord.totalAmount)}",
+                                                text = "${ord.quantity}x ${ord.bindingTypeName} • ${viewModel.formatPrice(ord.totalAmount)}",
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                             )
@@ -251,8 +251,8 @@ fun DeliveryScreen(
                         HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = SaddleBrown.copy(alpha = 0.2f))
 
                         // Financial balance
-                        ReceiptRow("Importe Total:", "$${String.format(java.util.Locale.US, "%.2f", order.totalAmount)}")
-                        ReceiptRow("Anticipo abonado:", "$${String.format(java.util.Locale.US, "%.2f", order.depositPaid)}")
+                        ReceiptRow("Importe Total:", viewModel.formatPrice(order.totalAmount))
+                        ReceiptRow("Anticipo abonado:", viewModel.formatPrice(order.depositPaid))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -261,7 +261,7 @@ fun DeliveryScreen(
                         ) {
                             Text("Saldo a Cancelar:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
-                                text = "$${String.format(java.util.Locale.US, "%.2f", order.balanceDue)}",
+                                text = viewModel.formatPrice(order.balanceDue),
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = 15.sp,
                                 color = if (order.balanceDue > 0) Terracotta else ForestGreen

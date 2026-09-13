@@ -120,6 +120,7 @@ fun QuotationScreen(
     val customerEmail by viewModel.quoteCustomerEmail.collectAsState()
     val customerNotes by viewModel.quoteCustomerNotes.collectAsState()
     val depositPaid by viewModel.quoteDepositPaid.collectAsState()
+    val currencySettings by viewModel.currencySettings.collectAsState()
 
     val coverColorHex by viewModel.simulatorColorHex.collectAsState()
     val foilTitle by viewModel.simulatorFoilTitle.collectAsState()
@@ -135,7 +136,7 @@ fun QuotationScreen(
         sheetCount, pageCount, paperType, coverMaterial,
         coverColorHex, foilTitle, foilSubtitle, foilColor,
         hasRibbon, hasCorners, hasSlipcase, hasMarbled,
-        quoteResult, customerName, customerNotes
+        quoteResult, customerName, customerNotes, currencySettings
     ) {
         ProposalExportSpec(
             bindingType = quoteBinding,
@@ -156,7 +157,8 @@ fun QuotationScreen(
             hasEndpapers = hasMarbled,
             clientName = customerName,
             clientNotes = customerNotes,
-            quoteResult = quoteResult
+            quoteResult = quoteResult,
+            currencySettings = currencySettings
         )
     }
 
@@ -474,12 +476,12 @@ fun QuotationScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    ExtraCheckboxRow("Cinta señaladora de raso (+$1.50)", hasRibbon) { viewModel.setQuoteHasRibbon(it) }
-                    ExtraCheckboxRow("Esquineros metálicos de bronce (+$3.20)", hasCorners) { viewModel.setQuoteHasCorners(it) }
-                    ExtraCheckboxRow("Cierre con elástico plano (+$2.00)", hasElastic) { viewModel.setQuoteHasElastic(it) }
-                    ExtraCheckboxRow("Guardas marmoleadas al agua (+$4.50)", hasMarbled) { viewModel.setQuoteHasMarbledEndpapers(it) }
-                    ExtraCheckboxRow("Grabado en Foil Dorado/Plata (+$5.00)", hasFoil) { viewModel.setQuoteHasFoil(it) }
-                    ExtraCheckboxRow("Caja contenedora Slipcase a medida (+$12.00)", hasSlipcase) { viewModel.setQuoteHasSlipcase(it) }
+                    ExtraCheckboxRow("Cinta señaladora de raso (+${viewModel.formatPrice(1.50)})", hasRibbon) { viewModel.setQuoteHasRibbon(it) }
+                    ExtraCheckboxRow("Esquineros metálicos de bronce (+${viewModel.formatPrice(3.20)})", hasCorners) { viewModel.setQuoteHasCorners(it) }
+                    ExtraCheckboxRow("Cierre con elástico plano (+${viewModel.formatPrice(2.00)})", hasElastic) { viewModel.setQuoteHasElastic(it) }
+                    ExtraCheckboxRow("Guardas marmoleadas al agua (+${viewModel.formatPrice(4.50)})", hasMarbled) { viewModel.setQuoteHasMarbledEndpapers(it) }
+                    ExtraCheckboxRow("Grabado en Foil Dorado/Plata (+${viewModel.formatPrice(5.00)})", hasFoil) { viewModel.setQuoteHasFoil(it) }
+                    ExtraCheckboxRow("Caja contenedora Slipcase a medida (+${viewModel.formatPrice(12.00)})", hasSlipcase) { viewModel.setQuoteHasSlipcase(it) }
                 }
             }
         }
@@ -605,7 +607,7 @@ fun QuotationScreen(
                             )
                         }
                         Text(
-                            text = "${quantity}x $${String.format(java.util.Locale.US, "%.2f", quoteResult.unitPrice)}/ud",
+                            text = "${quantity}x ${viewModel.formatPrice(quoteResult.unitPrice)}/ud",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -614,15 +616,15 @@ fun QuotationScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    CostLine("Base Encuadernación (${quoteBinding.name})", quoteResult.basePrice)
-                    CostLine("Papel interior ($paperType)", quoteResult.paperCost)
-                    CostLine("Cubierta ($coverMaterial)", quoteResult.coverMaterialCost)
-                    CostLine("Acabados y Herrajes Extras", quoteResult.extrasCost)
-                    CostLine("Mano de obra especializada", quoteResult.laborCost)
+                    CostLine("Base Encuadernación (${quoteBinding.name})", viewModel.formatPrice(quoteResult.basePrice))
+                    CostLine("Papel interior ($paperType)", viewModel.formatPrice(quoteResult.paperCost))
+                    CostLine("Cubierta ($coverMaterial)", viewModel.formatPrice(quoteResult.coverMaterialCost))
+                    CostLine("Acabados y Herrajes Extras", viewModel.formatPrice(quoteResult.extrasCost))
+                    CostLine("Mano de obra especializada", viewModel.formatPrice(quoteResult.laborCost))
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline)
 
-                    CostLine("Subtotal (${quantity} unidades)", quoteResult.subtotal, isBold = false)
+                    CostLine("Subtotal (${quantity} unidades)", viewModel.formatPrice(quoteResult.subtotal), isBold = false)
 
                     if (quoteResult.totalDiscountAmount > 0) {
                         Row(
@@ -638,7 +640,7 @@ fun QuotationScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "-$${String.format(java.util.Locale.US, "%.2f", quoteResult.totalDiscountAmount)}",
+                                text = "-${viewModel.formatPrice(quoteResult.totalDiscountAmount)}",
                                 color = MaterialTheme.colorScheme.primary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
@@ -660,7 +662,7 @@ fun QuotationScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "$${String.format(java.util.Locale.US, "%.2f", quoteResult.total)}",
+                            text = viewModel.formatPrice(quoteResult.total),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary
@@ -729,7 +731,7 @@ fun QuotationScreen(
                         OutlinedTextField(
                             value = depositPaid,
                             onValueChange = { viewModel.setQuoteDepositPaid(it) },
-                            label = { Text("Anticipo / Seña $") },
+                            label = { Text("Anticipo / Seña (${currencySettings.currency.symbol})") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f).testTag("input_deposit_paid"),
                             singleLine = true,
@@ -848,7 +850,7 @@ fun ExtraCheckboxRow(label: String, checked: Boolean, onCheckedChange: (Boolean)
 }
 
 @Composable
-fun CostLine(label: String, amount: Double, isBold: Boolean = false) {
+fun CostLine(label: String, formattedAmount: String, isBold: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -862,7 +864,7 @@ fun CostLine(label: String, amount: Double, isBold: Boolean = false) {
             color = if (isBold) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = "$${String.format(java.util.Locale.US, "%.2f", amount)}",
+            text = formattedAmount,
             fontSize = 13.sp,
             fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface

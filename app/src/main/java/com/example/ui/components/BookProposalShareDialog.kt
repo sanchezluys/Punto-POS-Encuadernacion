@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.data.model.CurrencyFormatter
 import com.example.ui.theme.GoldenOchre
 import com.example.ui.theme.SaddleBrown
 import com.example.util.BookProposalImageGenerator
@@ -326,7 +327,7 @@ fun BookProposalShareDialog(
                                 append("Formato: ${spec.widthCm} x ${spec.lengthCm} cm (Lomo: ${String.format(java.util.Locale.US, "%.1f", spec.spineThicknessMm)} mm)\n")
                                 append("Hojas: ${spec.sheetCount} (${spec.pageCount} páginas) - ${spec.paperType}\n")
                                 append("Cubiertas: ${spec.coverMaterial} con Foil ${spec.foilColorType}\n")
-                                append("Presupuesto: $${String.format(java.util.Locale.US, "%.2f", spec.quoteResult.total)} (${spec.quoteResult.quantity} ud.)\n")
+                                append("Presupuesto: ${CurrencyFormatter.format(spec.quoteResult.total, spec.currencySettings)} (${spec.quoteResult.quantity} ud.)\n")
                             }
                             clipboard.setPrimaryClip(ClipData.newPlainText("Cotización", summary))
                             Toast.makeText(context, "Resumen copiado al portapapeles", Toast.LENGTH_SHORT).show()

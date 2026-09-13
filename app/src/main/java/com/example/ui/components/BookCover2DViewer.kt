@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -84,10 +85,18 @@ fun BookCover2DViewer(
     lengthCm: Float = 21.0f,
     spineThicknessMm: Float = 16.0f,
     sheetCount: Int = 60,
-    grammageGsm: Int = 90
+    grammageGsm: Int = 90,
+    zoomScale: Float = 1.0f,
+    onZoomChange: (Float) -> Unit = {}
 ) {
-    var zoomScale by remember { mutableFloatStateOf(1.0f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
+
+    // Reset pan if zoom drops back to normal
+    LaunchedEffect(zoomScale) {
+        if (zoomScale <= 1.05f) {
+            panOffset = Offset.Zero
+        }
+    }
 
     val animatedZoom by animateFloatAsState(
         targetValue = zoomScale,
@@ -110,7 +119,7 @@ fun BookCover2DViewer(
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     val newZoom = (zoomScale * zoom).coerceIn(0.7f, 4.0f)
-                    zoomScale = newZoom
+                    onZoomChange(newZoom)
                     if (newZoom > 1.05f) {
                         panOffset += pan
                     } else {
@@ -122,17 +131,17 @@ fun BookCover2DViewer(
                 detectTapGestures(
                     onDoubleTap = {
                         if (zoomScale > 1.15f) {
-                            zoomScale = 1.0f
+                            onZoomChange(1.0f)
                             panOffset = Offset.Zero
                         } else {
-                            zoomScale = 2.2f
+                            onZoomChange(2.0f)
                         }
                     }
                 )
             }
             .testTag("book_2d_viewer_container")
     ) {
-        // Lienzo 2D con las tapas y el lomo
+        // Lienzo 2D con las tapas y el lomo (completamente limpio, sin textos ni botones superpuestos)
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -158,126 +167,6 @@ fun BookCover2DViewer(
                 lengthCm = lengthCm,
                 spineThicknessMm = spineThicknessMm
             )
-        }
-
-        // Controles limpios de Acercar / Alejar / Restablecer
-        Surface(
-            color = Color.White.copy(alpha = 0.92f),
-            shape = RoundedCornerShape(14.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD6DAE4)),
-            shadowElevation = 3.dp,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(10.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp)
-            ) {
-                // Botón Alejar (-)
-                IconButton(
-                    onClick = {
-                        val nextZoom = (zoomScale - 0.35f).coerceIn(0.7f, 4.0f)
-                        zoomScale = nextZoom
-                        if (nextZoom <= 1.05f) panOffset = Offset.Zero
-                    },
-                    modifier = Modifier
-                        .size(32.dp)
-                        .testTag("btn_zoom_out_2d")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Remove,
-                        contentDescription = "Alejar",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                // Indicador de nivel de zoom (tocar restablece a 100%)
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (zoomScale > 1.05f || zoomScale < 0.95f) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        Color(0xFFEFF1F6)
-                    },
-                    modifier = Modifier
-                        .clickable {
-                            zoomScale = 1.0f
-                            panOffset = Offset.Zero
-                        }
-                        .testTag("label_zoom_indicator")
-                ) {
-                    Text(
-                        text = "${(zoomScale * 100).toInt()}%",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (zoomScale > 1.05f || zoomScale < 0.95f) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
-                    )
-                }
-
-                // Botón Acercar (+)
-                IconButton(
-                    onClick = {
-                        val nextZoom = (zoomScale + 0.35f).coerceIn(0.7f, 4.0f)
-                        zoomScale = nextZoom
-                    },
-                    modifier = Modifier
-                        .size(32.dp)
-                        .testTag("btn_zoom_in_2d")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Acercar",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                if (zoomScale > 1.05f || zoomScale < 0.95f || panOffset != Offset.Zero) {
-                    IconButton(
-                        onClick = {
-                            zoomScale = 1.0f
-                            panOffset = Offset.Zero
-                        },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("btn_zoom_reset_2d")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.RestartAlt,
-                            contentDescription = "Restablecer zoom",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Sugerencia discreta al estado inicial
-        if (zoomScale <= 1.05f && panOffset == Offset.Zero) {
-            Surface(
-                color = Color.Black.copy(alpha = 0.50f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = "Pellizca o usa +/- para acercar",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                )
-            }
         }
     }
 }
@@ -309,8 +198,8 @@ private fun DrawScope.drawBookSpread(
     val totalHeightCm = lengthCm.coerceAtLeast(10f)
     val spreadAspect = totalSpreadCm / totalHeightCm
 
-    val availableW = size.width * 0.90f
-    val availableH = size.height * 0.74f
+    val availableW = size.width * 0.94f
+    val availableH = size.height * 0.90f
 
     val (fitW, fitH) = if (availableW / availableH > spreadAspect) {
         Pair(availableH * spreadAspect, availableH)
@@ -325,11 +214,13 @@ private fun DrawScope.drawBookSpread(
     val topY = centerY - spreadH / 2f
     val bottomY = topY + spreadH
 
-    val coverW = (widthCm / totalSpreadCm) * spreadW
-    val spineW = (spineCm / totalSpreadCm) * spreadW
-    val hingeW = (hingeCm / totalSpreadCm) * spreadW
+    val rawHingeW = (hingeCm / totalSpreadCm) * spreadW
+    val hingeW = rawHingeW.coerceAtLeast(6f * zoom)
+    val rawSpineW = (spineCm / totalSpreadCm) * spreadW
+    val spineW = rawSpineW.coerceAtLeast(24f * zoom)
+    val coverW = ((spreadW - spineW - (hingeW * 2f)) / 2f).coerceAtLeast(30f * zoom)
 
-    // Coordenadas horizontales de cada elemento
+    // Coordenadas horizontales de cada elemento: Contratapa (tapa trasera) + Lomo + Portada (tapa delantera)
     val backLeft = startX
     val backRight = backLeft + coverW
 
@@ -748,24 +639,6 @@ private fun DrawScope.drawBookSpread(
         // Cantoneras en Portada (esquinas exteriores derechas)
         drawCornerGuard(frontRight, topY, cornerSize, isTop = true, isLeft = false, brassGold, brassDark)
         drawCornerGuard(frontRight, bottomY, cornerSize, isTop = false, isLeft = false, brassGold, brassDark)
-    }
-
-    // 10. Rótulos técnicos discretos estilo plano de taller
-    drawIntoCanvas { canvas ->
-        val labelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.rgb(105, 115, 130)
-            textSize = (9.5f * zoom).coerceIn(7f, 15f)
-            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
-        val labelY = topY - 8f * zoom
-        // Contratapa
-        canvas.nativeCanvas.drawText("CONTRATAPA", backLeft + coverW / 2f, labelY, labelPaint)
-        // Lomo
-        val spineThicknessText = String.format(Locale.US, "%.1f", spineThicknessMm)
-        canvas.nativeCanvas.drawText("LOMO ($spineThicknessText mm)", spineLeft + spineW / 2f, labelY, labelPaint)
-        // Portada
-        canvas.nativeCanvas.drawText("PORTADA", frontLeft + coverW / 2f, labelY, labelPaint)
     }
 }
 
