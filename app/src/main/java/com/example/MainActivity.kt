@@ -27,11 +27,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
@@ -127,7 +127,7 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Default.MenuBook,
+                                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                     contentDescription = "Logo",
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(20.dp)
@@ -346,7 +346,7 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
 
 fun getScreenIcon(screen: AppNavScreen): ImageVector {
     return when (screen) {
-        AppNavScreen.CATALOGO -> Icons.Default.MenuBook
+        AppNavScreen.CATALOGO -> Icons.AutoMirrored.Filled.MenuBook
         AppNavScreen.SIMULADOR -> Icons.Default.Palette
         AppNavScreen.COTIZADOR -> Icons.Default.Calculate
         AppNavScreen.PEDIDOS -> Icons.Default.Inventory2

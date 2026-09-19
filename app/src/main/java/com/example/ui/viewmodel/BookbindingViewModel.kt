@@ -2,11 +2,15 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import coil.size.Precision
 import com.example.R
 import com.example.data.db.AppDatabase
 import com.example.data.model.AppCurrency
@@ -33,8 +37,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.io.InputStream
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -425,18 +430,46 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun setSimulatorCustomBitmap(bitmap: Bitmap?) {
-        _simulatorCustomBitmap.value = bitmap
+        if (bitmap == null) {
+            _simulatorCustomBitmap.value = null
+            return
+        }
+        val maxDim = 1024
+        if (bitmap.width > maxDim || bitmap.height > maxDim) {
+            val scale = maxDim.toFloat() / maxOf(bitmap.width, bitmap.height)
+            val newW = (bitmap.width * scale).toInt().coerceAtLeast(1)
+            val newH = (bitmap.height * scale).toInt().coerceAtLeast(1)
+            val scaled = Bitmap.createScaledBitmap(bitmap, newW, newH, true)
+            _simulatorCustomBitmap.value = scaled
+        } else {
+            _simulatorCustomBitmap.value = bitmap
+        }
     }
 
     fun applyPresetTexture(preset: TexturePreset) {
         _simulatorColorHex.value = preset.colorHex
         if (preset.drawableResId != null) {
-            try {
-                val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                val bmp = BitmapFactory.decodeResource(getApplication<Application>().resources, preset.drawableResId, opts)
-                _simulatorCustomBitmap.value = bmp
-            } catch (e: Exception) {
-                _simulatorCustomBitmap.value = null
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val context = getApplication<Application>()
+                    val request = ImageRequest.Builder(context)
+                        .data(preset.drawableResId)
+                        .size(1024, 1024)
+                        .precision(Precision.INEXACT)
+                        .allowHardware(false)
+                        .build()
+                    val result = context.imageLoader.execute(request)
+                    val bmp = if (result is SuccessResult) {
+                        (result.drawable as? BitmapDrawable)?.bitmap
+                    } else null
+                    withContext(Dispatchers.Main) {
+                        _simulatorCustomBitmap.value = bmp
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        _simulatorCustomBitmap.value = null
+                    }
+                }
             }
         } else {
             _simulatorCustomBitmap.value = null
@@ -444,11 +477,22 @@ class BookbindingViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun loadBitmapFromUri(uri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val inputStream: InputStream? = getApplication<Application>().contentResolver.openInputStream(uri)
-                val bmp = BitmapFactory.decodeStream(inputStream)
-                _simulatorCustomBitmap.value = bmp
+                val context = getApplication<Application>()
+                val request = ImageRequest.Builder(context)
+                    .data(uri)
+                    .size(1024, 1024)
+                    .precision(Precision.INEXACT)
+                    .allowHardware(false)
+                    .build()
+                val result = context.imageLoader.execute(request)
+                if (result is SuccessResult) {
+                    val bmp = (result.drawable as? BitmapDrawable)?.bitmap
+                    withContext(Dispatchers.Main) {
+                        _simulatorCustomBitmap.value = bmp
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

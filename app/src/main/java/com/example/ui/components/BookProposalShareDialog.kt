@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -55,7 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -251,8 +250,8 @@ fun BookProposalShareDialog(
                                     .verticalScroll(rememberScrollState()),
                                 contentAlignment = Alignment.TopCenter
                             ) {
-                                Image(
-                                    bitmap = bmp.asImageBitmap(),
+                                AsyncImage(
+                                    model = bmp,
                                     contentDescription = "Ficha Comercial de la Encuadernación",
                                     modifier = Modifier
                                         .fillMaxWidth()
