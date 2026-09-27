@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <!-- Base application theme using Material Light NoActionBar for Android 15 edge-to-edge compliance -->
+    <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Edge-to-edge display and insets are handled dynamically via enableEdgeToEdge() and WindowInsets -->
+    </style>
 </resources>

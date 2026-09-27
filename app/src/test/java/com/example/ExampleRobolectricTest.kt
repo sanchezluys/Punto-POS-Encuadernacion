@@ -84,4 +84,13 @@ class ExampleRobolectricTest {
     viewModel.setSimulatorCustomBitmap(null)
     assertNull("El bitmap debe ser null al removerse", viewModel.simulatorCustomBitmap.value)
   }
+
+  @Test
+  fun `verify MainActivity edge to edge launch and theme initialization`() {
+    val activityController = org.robolectric.Robolectric.buildActivity(MainActivity::class.java)
+    val activity = activityController.setup().get()
+    assertNotNull("MainActivity debe inicializarse con enableEdgeToEdge correctamente", activity)
+    assertNotNull("Window debe existir", activity.window)
+    activityController.destroy()
+  }
 }
