@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -40,6 +42,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -73,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.data.model.AppCurrency
 import com.example.data.model.CurrencyFormatter
 import com.example.data.model.CurrencySettings
@@ -82,6 +86,7 @@ import com.example.ui.theme.LeatherDark
 import com.example.ui.theme.SaddleBrown
 import com.example.ui.theme.Terracotta
 import com.example.ui.viewmodel.BookbindingViewModel
+import com.example.update.InAppUpdateUiState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,8 +94,16 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     viewModel: BookbindingViewModel,
     onNavigateBack: () -> Unit = {},
-    snackbarHostState: SnackbarHostState? = null
+    snackbarHostState: SnackbarHostState? = null,
+    updateUiState: InAppUpdateUiState = InAppUpdateUiState.Idle,
+    onCheckUpdates: () -> Unit = {},
+    onStartUpdate: (InAppUpdateUiState.Available) -> Unit = {},
+    onCompleteUpdate: () -> Unit = {}
 ) {
+    BackHandler {
+        onNavigateBack()
+    }
+
     val currencySettings by viewModel.currencySettings.collectAsState()
     val scope = rememberCoroutineScope()
     var rateInputText by remember(currencySettings.customExchangeRate) {
@@ -547,6 +560,171 @@ fun SettingsScreen(
                                     },
                                     label = { Text("1.0 (Directo)", fontSize = 11.sp) }
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5b. ACTUALIZACIONES DE GOOGLE PLAY
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("card_play_updates_settings"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Actualizaciones (Google Play)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Versión instalada: v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    when (updateUiState) {
+                        is InAppUpdateUiState.Checking -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Consultando Google Play Store...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        is InAppUpdateUiState.Available -> {
+                            Text(
+                                text = "Hay una nueva versión disponible en Google Play Store.",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = { onStartUpdate(updateUiState) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("btn_settings_install_update"),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Descargar actualización", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        is InAppUpdateUiState.Downloading -> {
+                            val pct = (updateUiState.progress * 100).toInt()
+                            Text(
+                                text = "Descargando actualización desde Google Play ($pct%)...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        is InAppUpdateUiState.Downloaded -> {
+                            Text(
+                                text = "Actualización descargada y lista para instalarse.",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ForestGreen
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = onCompleteUpdate,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("btn_settings_restart_update"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                            ) {
+                                Text("Reiniciar para instalar", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        is InAppUpdateUiState.UpToDate -> {
+                            Text(
+                                text = "Tu app está actualizada a la última versión de Google Play.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ForestGreen
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = onCheckUpdates,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("btn_check_updates"),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Buscar actualizaciones")
+                            }
+                        }
+                        is InAppUpdateUiState.InfoMessage -> {
+                            Text(
+                                text = updateUiState.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = onCheckUpdates,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("btn_check_updates"),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Reintentar verificación")
+                            }
+                        }
+                        is InAppUpdateUiState.Idle -> {
+                            OutlinedButton(
+                                onClick = onCheckUpdates,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("btn_check_updates"),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Buscar actualizaciones en Play Store")
                             }
                         }
                     }

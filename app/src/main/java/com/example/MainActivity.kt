@@ -1,24 +1,28 @@
 package com.example
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,49 +33,55 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Calculate
-import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Warehouse
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.model.OrderStatus
 import com.example.ui.screens.CatalogScreen
 import com.example.ui.screens.DeliveryScreen
@@ -81,12 +91,11 @@ import com.example.ui.screens.QuotationScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SimulatorScreen
 import com.example.ui.theme.ArtisanTheme
-import com.example.ui.theme.GoldenOchre
-import com.example.ui.theme.LeatherDark
 import com.example.ui.theme.SaddleBrown
-import com.example.ui.theme.Terracotta
 import com.example.ui.viewmodel.AppNavScreen
 import com.example.ui.viewmodel.BookbindingViewModel
+import com.example.update.InAppUpdateUiState
+import com.example.update.PlayInAppUpdateManager
 
 class MainActivity : ComponentActivity() {
 
@@ -104,9 +113,54 @@ class MainActivity : ComponentActivity() {
             )
         )
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         setContent {
             ArtisanTheme {
-                MainAppContent(viewModel = viewModel)
+                val context = LocalContext.current
+                val updateManager = remember(context) { PlayInAppUpdateManager(context) }
+                val updateUiState by updateManager.uiState.collectAsState()
+                val lifecycleOwner = LocalLifecycleOwner.current
+
+                val updateLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartIntentSenderForResult()
+                ) { result ->
+                    updateManager.onActivityResult(result.resultCode)
+                }
+
+                LaunchedEffect(Unit) {
+                    updateManager.checkForUpdates(userInitiated = false)
+                }
+
+                DisposableEffect(lifecycleOwner, updateManager) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            updateManager.checkOnResume()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                        updateManager.dispose()
+                    }
+                }
+
+                LaunchedEffect(updateUiState) {
+                    val state = updateUiState
+                    if (state is InAppUpdateUiState.Available && state.shouldLaunchImmediately) {
+                        updateManager.startUpdateFlow(state, updateLauncher)
+                    }
+                }
+
+                MainAppContent(
+                    viewModel = viewModel,
+                    updateUiState = updateUiState,
+                    onCheckUpdates = { updateManager.checkForUpdates(userInitiated = true) },
+                    onStartUpdate = { available -> updateManager.startUpdateFlow(available, updateLauncher) },
+                    onDismissUpdateBanner = { versionCode -> updateManager.dismissBanner(versionCode) },
+                    onCompleteUpdate = { updateManager.completeFlexibleUpdate() }
+                )
             }
         }
     }
@@ -114,7 +168,14 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppContent(viewModel: BookbindingViewModel) {
+fun MainAppContent(
+    viewModel: BookbindingViewModel,
+    updateUiState: InAppUpdateUiState = InAppUpdateUiState.Idle,
+    onCheckUpdates: () -> Unit = {},
+    onStartUpdate: (InAppUpdateUiState.Available) -> Unit = {},
+    onDismissUpdateBanner: (Int) -> Unit = {},
+    onCompleteUpdate: () -> Unit = {}
+) {
     val currentScreen by viewModel.currentScreen.collectAsState()
     val orders by viewModel.allOrders.collectAsState()
     val lowStockMaterials by viewModel.lowStockMaterials.collectAsState()
@@ -122,6 +183,19 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
 
     val pendingOrdersCount = orders.count { it.status == OrderStatus.EN_TALLER || it.status == OrderStatus.CONFIRMADO }
     val readyToDeliverCount = orders.count { it.status == OrderStatus.TERMINADO }
+
+    LaunchedEffect(updateUiState) {
+        if (updateUiState is InAppUpdateUiState.Downloaded) {
+            val result = snackbarHostState.showSnackbar(
+                message = "Actualización descargada y lista para instalar.",
+                actionLabel = "Reiniciar",
+                duration = SnackbarDuration.Indefinite
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                onCompleteUpdate()
+            }
+        }
+    }
 
     Scaffold(
         modifier = Modifier
@@ -332,26 +406,151 @@ fun MainAppContent(viewModel: BookbindingViewModel) {
             }
         }
     ) { innerPadding ->
-        AnimatedContent(
-            targetState = currentScreen,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            label = "screen_transition"
-        ) { screen ->
-            when (screen) {
-                AppNavScreen.CATALOGO -> CatalogScreen(viewModel = viewModel)
-                AppNavScreen.SIMULADOR -> SimulatorScreen(viewModel = viewModel)
-                AppNavScreen.COTIZADOR -> QuotationScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
-                AppNavScreen.PEDIDOS -> OrdersScreen(viewModel = viewModel)
-                AppNavScreen.ENTREGAS -> DeliveryScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
-                AppNavScreen.INVENTARIO -> InventoryScreen(viewModel = viewModel)
-                AppNavScreen.AJUSTES -> SettingsScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = { viewModel.navigateBack() },
-                    snackbarHostState = snackbarHostState
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+        ) {
+            AnimatedVisibility(
+                visible = (updateUiState is InAppUpdateUiState.Available && !updateUiState.shouldLaunchImmediately) ||
+                    updateUiState is InAppUpdateUiState.Downloading
+            ) {
+                InAppUpdateBanner(
+                    updateUiState = updateUiState,
+                    onStartUpdate = onStartUpdate,
+                    onDismiss = onDismissUpdateBanner
                 )
+            }
+
+            AnimatedContent(
+                targetState = currentScreen,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                label = "screen_transition"
+            ) { screen ->
+                when (screen) {
+                    AppNavScreen.CATALOGO -> CatalogScreen(viewModel = viewModel)
+                    AppNavScreen.SIMULADOR -> SimulatorScreen(viewModel = viewModel)
+                    AppNavScreen.COTIZADOR -> QuotationScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
+                    AppNavScreen.PEDIDOS -> OrdersScreen(viewModel = viewModel)
+                    AppNavScreen.ENTREGAS -> DeliveryScreen(viewModel = viewModel, snackbarHostState = snackbarHostState)
+                    AppNavScreen.INVENTARIO -> InventoryScreen(viewModel = viewModel)
+                    AppNavScreen.AJUSTES -> SettingsScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { viewModel.navigateBack() },
+                        snackbarHostState = snackbarHostState,
+                        updateUiState = updateUiState,
+                        onCheckUpdates = onCheckUpdates,
+                        onStartUpdate = onStartUpdate,
+                        onCompleteUpdate = onCompleteUpdate
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InAppUpdateBanner(
+    updateUiState: InAppUpdateUiState,
+    onStartUpdate: (InAppUpdateUiState.Available) -> Unit,
+    onDismiss: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .testTag("in_app_update_banner"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            when (updateUiState) {
+                is InAppUpdateUiState.Available -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = "Actualización disponible",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Actualización disponible",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Hay mejoras y correcciones listas en Google Play.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                        Button(
+                            onClick = { onStartUpdate(updateUiState) },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("btn_banner_update")
+                        ) {
+                            Text("Actualizar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        IconButton(
+                            onClick = { onDismiss(updateUiState.availableVersionCode) },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("btn_banner_dismiss_update")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Descartar aviso de actualización",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+                is InAppUpdateUiState.Downloading -> {
+                    val percent = (updateUiState.progress * 100).toInt()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Descargando actualización de Play Store...",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = "$percent%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    if (updateUiState.totalBytesToDownload > 0L) {
+                        LinearProgressIndicator(
+                            progress = { updateUiState.progress },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                else -> Unit
             }
         }
     }

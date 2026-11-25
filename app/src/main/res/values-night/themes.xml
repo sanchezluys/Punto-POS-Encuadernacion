@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Night theme using Material NoActionBar for Android 15+ edge-to-edge compliance -->
+    <style name="Theme.MyApplication" parent="android:Theme.Material.NoActionBar">
+        <!-- Edge-to-edge display and insets are handled dynamically via enableEdgeToEdge() and WindowInsets -->
+    </style>
+</resources>

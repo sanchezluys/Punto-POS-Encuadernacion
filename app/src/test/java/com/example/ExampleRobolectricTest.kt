@@ -232,6 +232,58 @@ class ExampleRobolectricTest {
     val activity = activityController.setup().get()
     assertNotNull("MainActivity debe inicializarse con enableEdgeToEdge correctamente", activity)
     assertNotNull("Window debe existir", activity.window)
+    assertEquals(false, activity.window.isNavigationBarContrastEnforced)
     activityController.destroy()
+  }
+
+  @Test
+  fun `qa verify PlayInAppUpdateManager flexible and immediate update states`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val fakeManager = com.google.android.play.core.appupdate.testing.FakeAppUpdateManager(context)
+    val updateHelper = com.example.update.PlayInAppUpdateManager(fakeManager)
+
+    // 1. No update available -> user-initiated check yields UpToDate
+    fakeManager.setUpdateNotAvailable()
+    updateHelper.checkForUpdates(userInitiated = true)
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    assertTrue(
+      "Cuando no hay actualización debe indicar UpToDate",
+      updateHelper.uiState.value is com.example.update.InAppUpdateUiState.UpToDate
+    )
+
+    // 2. Standard update available (low priority) -> Flexible non-blocking notification
+    fakeManager.setUpdateAvailable(99)
+    fakeManager.setUpdatePriority(1)
+    updateHelper.checkForUpdates(userInitiated = false)
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    val flexibleState = updateHelper.uiState.value
+    assertTrue(
+      "Actualización estándar debe mostrar banner flexible",
+      flexibleState is com.example.update.InAppUpdateUiState.Available &&
+        flexibleState.updateType == com.google.android.play.core.install.model.AppUpdateType.FLEXIBLE &&
+        !flexibleState.shouldLaunchImmediately
+    )
+
+    // 3. Dismiss banner suppresses auto-prompt for same version, manual check restores it
+    updateHelper.dismissBanner(99)
+    assertEquals(com.example.update.InAppUpdateUiState.Idle, updateHelper.uiState.value)
+    updateHelper.checkForUpdates(userInitiated = false)
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    assertEquals(com.example.update.InAppUpdateUiState.Idle, updateHelper.uiState.value)
+
+    // 4. High priority update (>= 4) -> Immediate update flow
+    fakeManager.setUpdateAvailable(100)
+    fakeManager.setUpdatePriority(5)
+    updateHelper.checkForUpdates(userInitiated = false)
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    val immediateState = updateHelper.uiState.value
+    assertTrue(
+      "Actualización crítica debe activar flujo inmediato",
+      immediateState is com.example.update.InAppUpdateUiState.Available &&
+        immediateState.updateType == com.google.android.play.core.install.model.AppUpdateType.IMMEDIATE &&
+        immediateState.shouldLaunchImmediately
+    )
+
+    updateHelper.dispose()
   }
 }
